@@ -3,4 +3,5 @@ project(homeworkone_3)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(homeworkone_3 main.cpp)
+add_executable(homeworkone_3 main.cpp
+        unq_ptr.h)
