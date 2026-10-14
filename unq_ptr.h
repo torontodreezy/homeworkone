@@ -12,13 +12,16 @@ private:
 
 public:
     explicit UnqPtr(T* ptr) : pointer(ptr) {}
+
     T* get() const {
         return pointer;
     }
+
     T& operator*() {
         return *pointer;
     }
-    UnqPtr(): pointer(nullptr){}
+
+    UnqPtr() : pointer(nullptr) {}
 
     void reset() {
         delete pointer;
@@ -33,19 +36,38 @@ public:
     }
 
     //подтипизация
-    template<class U>
-    
+    template <class U>
+    UnqPtr(const UnqPtr<U>& other) : pointer(nullptr) {
+        const T* ptr = other.get();
 
+        if (ptr != nullptr) {
+            pointer = new T(*ptr);
+        }
+    }
+
+    template <class U>
+    UnqPtr& operator=(const UnqPtr<U>& other) {
+        const T* source = other.get();
+        T* ptr = nullptr;
+
+        if (source != nullptr) {
+            ptr = new T(*source);
+        }
+
+        delete pointer;
+        pointer = ptr;
+
+        return *this;
+    }
 
     ~UnqPtr() {
         delete pointer;
     }
 
-    UnqPtr(const UnqPtr& other): pointer(nullptr) {
+    UnqPtr(const UnqPtr& other) : pointer(nullptr) {
         if (other.pointer != nullptr) {
             pointer = new T(*other.pointer);
         }
-
     }
 
     UnqPtr& operator=(const UnqPtr& other) {
@@ -59,11 +81,7 @@ public:
         }
         return *this;
     }
-
-
 };
-
-
 
 
 #endif //HOMEWORKONE_3_UNQ_PTR_H
