@@ -21,10 +21,7 @@ namespace tests
     {
         ShrdPtr<int> ptr(nullptr);
 
-        check(
-            ptr.get() == nullptr,
-            "Конструктор из nullptr"
-        );
+        check(ptr.get() == nullptr, "Конструктор из nullptr");
     }
 
     inline void shrdValue()
@@ -94,8 +91,7 @@ namespace tests
         );
 
         check(
-            first.get() == second.get()
-                && Tracked::alive == 1,
+            first.get() == second.get() && Tracked::alive == 1,
             "Нет общего владения"
         );
     }
@@ -127,8 +123,7 @@ namespace tests
         first = second;
 
         check(
-            first.get() == second.get()
-                && Tracked::alive == 1,
+            first.get() == second.get() && Tracked::alive == 1,
             "Присваивание совладельцев"
         );
     }
@@ -156,6 +151,7 @@ namespace tests
         );
 
         ShrdPtr<Tracked> empty;
+
         ptr = empty;
 
         check(
@@ -172,7 +168,6 @@ namespace tests
     inline void shrdLastOwner()
     {
         int before = Tracked::destroyed;
-
         ShrdPtr<Tracked> last;
 
         {
@@ -192,8 +187,7 @@ namespace tests
         }
 
         check(
-            last.get() != nullptr
-                && last.get()->value == 7,
+            last.get() != nullptr && last.get()->value == 7,
             "Объект не пережил первого владельца"
         );
 
@@ -411,6 +405,185 @@ namespace tests
         );
     }
 
+    inline void shrdArrayDefault()
+    {
+        ShrdPtr<int[]> first;
+        ShrdPtr<int[]> second(nullptr);
+
+        check(
+            first.get() == nullptr && second.get() == nullptr,
+            "Пустые дескрипторы массива"
+        );
+    }
+
+    inline void shrdArrayIndexCopy()
+    {
+        ShrdPtr<int[]> first(
+            new UnqPtr<int[]>(new int[3]{1, 2, 3})
+        );
+
+        ShrdPtr<int[]> second(first);
+
+        second[1] = 55;
+
+        check(
+            first.get() == second.get(),
+            "Массив должен быть общим"
+        );
+
+        check(
+            first[0] == 1 && first[1] == 55 && first[2] == 3,
+            "Индексация общего массива"
+        );
+    }
+
+    inline void shrdArrayAssign()
+    {
+        int before = ArrayTracked::destroyed;
+
+        ShrdPtr<ArrayTracked[]> first(
+            new UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
+        );
+
+        ShrdPtr<ArrayTracked[]> second(
+            new UnqPtr<ArrayTracked[]>(new ArrayTracked[2])
+        );
+
+        second = first;
+
+        check(
+            first.get() == second.get(),
+            "Присваивание дескрипторов массива"
+        );
+
+        check(
+            ArrayTracked::alive == 3
+                && ArrayTracked::destroyed == before + 2,
+            "Старый массив не удалён"
+        );
+    }
+
+    inline void shrdArraySelfAssign()
+    {
+        ShrdPtr<int[]> ptr(
+            new UnqPtr<int[]>(new int[2]{3, 4})
+        );
+
+        int* before = ptr.get();
+
+        ShrdPtr<int[]>& same = ptr;
+        ptr = same;
+
+        check(
+            ptr.get() == before && ptr[1] == 4,
+            "Самоприсваивание массива"
+        );
+    }
+
+    inline void shrdArrayLastOwner()
+    {
+        ShrdPtr<ArrayTracked[]> last;
+
+        {
+            ShrdPtr<ArrayTracked[]> first(
+                new UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
+            );
+
+            ShrdPtr<ArrayTracked[]> second(first);
+
+            last = second;
+        }
+
+        check(
+            ArrayTracked::alive == 3,
+            "Массив должен жить до последнего владельца"
+        );
+
+        last = ShrdPtr<ArrayTracked[]>();
+
+        check(
+            last.get() == nullptr && ArrayTracked::alive == 0,
+            "Последний владелец должен удалить массив"
+        );
+    }
+
+    inline void shrdArrayEmptyMaster()
+    {
+        ShrdPtr<int[]> first(new UnqPtr<int[]>());
+        ShrdPtr<int[]> second(first);
+
+        check(
+            first.get() == nullptr && second.get() == nullptr,
+            "Пустой ведущий владелец массива"
+        );
+    }
+
+    inline void shrdArrayDestructor()
+    {
+        int before = ArrayTracked::destroyed;
+
+        {
+            ShrdPtr<ArrayTracked[]> first(
+                new UnqPtr<ArrayTracked[]>(new ArrayTracked[4])
+            );
+
+            ShrdPtr<ArrayTracked[]> second(first);
+        }
+
+        check(
+            ArrayTracked::alive == 0
+                && ArrayTracked::destroyed == before + 4,
+            "Каждый элемент должен удалиться один раз"
+        );
+    }
+
+    inline void shrdArrayException()
+    {
+        try
+        {
+            ShrdPtr<ArrayTracked[]> first(
+                new UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
+            );
+
+            ShrdPtr<ArrayTracked[]> second(first);
+
+            throw std::runtime_error("Тест");
+        }
+        catch (const std::runtime_error&)
+        {
+        }
+
+        check(
+            ArrayTracked::alive == 0,
+            "Массив должен удалиться при исключении"
+        );
+    }
+
+    struct ArrayNode
+    {
+        ShrdPtr<ArrayNode[]> next;
+    };
+
+    inline void shrdArrayAssignFromElement()
+    {
+        ShrdPtr<ArrayNode[]> first(
+            new UnqPtr<ArrayNode[]>(new ArrayNode[1])
+        );
+
+        first[0].next = ShrdPtr<ArrayNode[]>(
+            new UnqPtr<ArrayNode[]>(new ArrayNode[1])
+        );
+
+        ArrayNode* expected = first[0].next.get();
+
+        first = first[0].next;
+
+        check(
+            first.get() == expected,
+            "Присваивание из элемента старого массива"
+        );
+    }
+
     inline void runShrdTests()
     {
         std::cout << "\n=== ShrdPtr ===\n";
@@ -418,59 +591,30 @@ namespace tests
         run("Пустой конструктор", shrdDefault);
         run("Конструктор из nullptr", shrdNull);
         run("Создание через ведущий UnqPtr", shrdValue);
-
-        run(
-            "Дескрипторы пустого ведущего указателя",
-            shrdEmptyMaster
-        );
-
+        run("Дескрипторы пустого ведущего указателя", shrdEmptyMaster);
         run("Копирование разделяет один объект", shrdCopy);
         run("Присваивание удаляет старый объект", shrdAssign);
         run("Присваивание самому себе", shrdSelfAssign);
-
-        run(
-            "Присваивание между совладельцами",
-            shrdSameObjectAssign
-        );
-
-        run(
-            "Копирование и присваивание пустых дескрипторов",
-            shrdEmptyCopy
-        );
-
-        run(
-            "Последнему владельцу присваивается пустой",
-            shrdEmptyAssign
-        );
-
-        run(
-            "Время жизни до последнего владельца",
-            shrdLastOwner
-        );
-
-        run(
-            "Подтипизация и удаление исходного наследника",
-            shrdSubtype
-        );
-
-        run(
-            "Подтипизация пустого дескриптора",
-            shrdEmptySubtype
-        );
-
-        run(
-            "Множественное наследование",
-            shrdMultipleInheritance
-        );
-
-        run(
-            "Последовательные переходы к базовым типам",
-            shrdSubtypeChain
-        );
-
+        run("Присваивание между совладельцами", shrdSameObjectAssign);
+        run("Копирование пустых дескрипторов", shrdEmptyCopy);
+        run("Последнему владельцу присваивается пустой", shrdEmptyAssign);
+        run("Время жизни до последнего владельца", shrdLastOwner);
+        run("Подтипизация и удаление наследника", shrdSubtype);
+        run("Подтипизация пустого дескриптора", shrdEmptySubtype);
+        run("Множественное наследование", shrdMultipleInheritance);
+        run("Цепочка переходов к базовым типам", shrdSubtypeChain);
         run("Освобождение при исключении", shrdException);
         run("1000 дескрипторов одного объекта", shrdManyOwners);
         run("1000 независимых объектов", shrdManyObjects);
+        run("Пустые дескрипторы массива", shrdArrayDefault);
+        run("Копирование и индексация массива", shrdArrayIndexCopy);
+        run("Присваивание дескрипторов массива", shrdArrayAssign);
+        run("Самоприсваивание дескриптора массива", shrdArraySelfAssign);
+        run("Последний владелец массива", shrdArrayLastOwner);
+        run("Пустой ведущий владелец массива", shrdArrayEmptyMaster);
+        run("Удаление всех элементов общего массива", shrdArrayDestructor);
+        run("Исключение при общем владении массивом", shrdArrayException);
+        run("Присваивание из элемента старого массива", shrdArrayAssignFromElement);
     }
 }
 

@@ -12,6 +12,16 @@ void checkAllDeleted()
         tests::Derived::alive == 0,
         "Остались Derived"
     );
+
+    tests::check(
+        tests::ArrayTracked::alive == 0,
+        "Остались элементы массива"
+    );
+
+    tests::check(
+        tests::UnqDerived::alive == 0,
+        "Остались UnqDerived"
+    );
 }
 
 int main()

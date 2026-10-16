@@ -82,6 +82,52 @@ namespace tests
     struct Leaf : public Middle
     {
     };
+
+    // Элементы массива.
+    struct ArrayTracked
+    {
+        inline static int alive = 0;
+        inline static int destroyed = 0;
+
+        int value = 0;
+
+        ArrayTracked()
+        {
+            ++alive;
+        }
+
+        ArrayTracked(const ArrayTracked&) = delete;
+        ArrayTracked& operator=(const ArrayTracked&) = delete;
+
+        ~ArrayTracked()
+        {
+            --alive;
+            ++destroyed;
+        }
+    };
+
+    // Для проверки перемещения UnqPtr к базовому типу.
+    struct UnqBase
+    {
+        int value = 10;
+
+        virtual ~UnqBase() {}
+    };
+
+    struct UnqDerived : public UnqBase
+    {
+        inline static int alive = 0;
+
+        UnqDerived()
+        {
+            ++alive;
+        }
+
+        ~UnqDerived() override
+        {
+            --alive;
+        }
+    };
 }
 
 #endif

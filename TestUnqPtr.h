@@ -2,9 +2,16 @@
 #define TEST_UNQ_PTR_H
 
 #include <string>
+#include <type_traits>
+#include <utility>
 #include "unq_ptr.h"
 #include "TestRunner.h"
 #include "TestObjects.h"
+
+static_assert(!std::is_copy_constructible_v<UnqPtr<int>>);
+static_assert(!std::is_copy_assignable_v<UnqPtr<int>>);
+static_assert(!std::is_copy_constructible_v<UnqPtr<int[]>>);
+static_assert(!std::is_copy_assignable_v<UnqPtr<int[]>>);
 
 namespace tests
 {
@@ -12,150 +19,132 @@ namespace tests
     {
         UnqPtr<int> ptr;
 
-        check(
-            ptr.get() == nullptr,
-            "Пустой владелец должен возвращать nullptr"
-        );
+        check(ptr.get() == nullptr, "Пустой владелец");
     }
 
     inline void unqNull()
     {
         UnqPtr<int> ptr(nullptr);
 
-        check(
-            ptr.get() == nullptr,
-            "Конструктор из nullptr"
-        );
+        check(ptr.get() == nullptr, "Конструктор из nullptr");
     }
 
     inline void unqValue()
     {
         UnqPtr<int> ptr(new int(42));
 
-        check(ptr.get() != nullptr, "Нет объекта");
-        check(*ptr.get() == 42, "Неверное значение");
+        check(
+            ptr.get() != nullptr && *ptr.get() == 42,
+            "Создание объекта"
+        );
     }
 
-    inline void unqCopy()
+    inline void unqMove()
     {
-        UnqPtr<int> first(new int(10));
-        UnqPtr<int> second(first);
+        UnqPtr<Tracked> first(new Tracked(10));
+        Tracked* ptr = first.get();
+
+        UnqPtr<Tracked> second(std::move(first));
 
         check(
-            first.get() != second.get(),
-            "Копии должны владеть разными объектами"
+            first.get() == nullptr,
+            "Источник перемещения должен стать пустым"
         );
 
         check(
-            *second.get() == 10,
-            "Значение не скопировано"
+            second.get() == ptr && second.get()->value == 10,
+            "Нужно передать прежний адрес"
         );
 
-        *second.get() = 30;
-
         check(
-            *first.get() == 10,
-            "Изменение копии затронуло исходный объект"
+            Tracked::alive == 1,
+            "Объект нельзя копировать при перемещении"
         );
     }
 
-    inline void unqAssign()
+    inline void unqMoveAssign()
     {
         int before = Tracked::destroyed;
 
-        {
-            UnqPtr<Tracked> first(new Tracked(10));
-            UnqPtr<Tracked> second(new Tracked(20));
+        UnqPtr<Tracked> first(new Tracked(10));
+        UnqPtr<Tracked> second(new Tracked(20));
 
-            second = first;
+        Tracked* ptr = first.get();
 
-            check(
-                Tracked::destroyed == before + 1,
-                "Старый объект не удалён"
-            );
-
-            check(
-                Tracked::alive == 2,
-                "Должно остаться два отдельных объекта"
-            );
-
-            check(
-                first.get() != second.get(),
-                "Присваивание скопировало только адрес"
-            );
-
-            check(
-                second.get()->value == 10,
-                "Неверное значение после присваивания"
-            );
-        }
+        second = std::move(first);
 
         check(
-            Tracked::alive == 0,
-            "Не все объекты удалены"
+            first.get() == nullptr && second.get() == ptr,
+            "Передача владения"
+        );
+
+        check(
+            Tracked::destroyed == before + 1
+                && Tracked::alive == 1,
+            "Старый объект должен удалиться"
         );
     }
 
-    inline void unqSelfAssign()
+    inline void unqSelfMove()
     {
         UnqPtr<int> ptr(new int(5));
         int* before = ptr.get();
 
         UnqPtr<int>& same = ptr;
-        ptr = same;
+        ptr = std::move(same);
 
         check(
             ptr.get() == before && *ptr.get() == 5,
-            "Самоприсваивание изменило объект"
+            "Самоперемещение"
         );
     }
 
-    inline void unqCopyEmpty()
+    inline void unqMoveEmpty()
     {
-        UnqPtr<int> first;
-        UnqPtr<int> second(first);
-
-        check(
-            second.get() == nullptr,
-            "Копия пустого владельца не пуста"
-        );
-    }
-
-    inline void unqAssignEmpty()
-    {
-        int before = Tracked::destroyed;
-
-        UnqPtr<Tracked> first(new Tracked(1));
         UnqPtr<Tracked> empty;
-
-        first = empty;
+        UnqPtr<Tracked> copy(std::move(empty));
 
         check(
-            first.get() == nullptr,
-            "Присваивание пустого владельца"
+            copy.get() == nullptr,
+            "Перемещение пустого владельца"
         );
 
+        UnqPtr<Tracked> full(new Tracked(1));
+        full = std::move(empty);
+
         check(
-            Tracked::destroyed == before + 1,
-            "Прежний объект не удалён"
+            full.get() == nullptr && Tracked::alive == 0,
+            "Перемещение пустого поверх непустого"
         );
     }
 
-    inline void unqAssignToEmpty()
+    inline void unqMoveToEmpty()
     {
         UnqPtr<int> first(new int(8));
         UnqPtr<int> second;
 
-        second = first;
+        second = std::move(first);
 
         check(
-            second.get() != nullptr,
-            "Пустой владелец не получил копию"
+            first.get() == nullptr && *second.get() == 8,
+            "Перемещение в пустой указатель"
         );
+    }
+
+    inline void unqRelease()
+    {
+        UnqPtr<Tracked> first(new Tracked(1));
+
+        Tracked* ptr = first.release();
+
+        bool empty = first.get() == nullptr;
+        bool live = Tracked::alive == 1;
+
+        delete ptr;
 
         check(
-            *second.get() == 8 && second.get() != first.get(),
-            "Неверная копия"
+            empty && live && Tracked::alive == 0,
+            "release не удаляет объект"
         );
     }
 
@@ -168,13 +157,9 @@ namespace tests
         ptr.reset(new Tracked(2));
 
         check(
-            Tracked::destroyed == before + 1,
-            "reset(new) не удалил прежний объект"
-        );
-
-        check(
-            ptr.get()->value == 2,
-            "reset(new) не принял новый объект"
+            Tracked::destroyed == before + 1
+                && ptr.get()->value == 2,
+            "Замена объекта"
         );
 
         ptr.reset();
@@ -188,27 +173,20 @@ namespace tests
 
     inline void unqResetSame()
     {
-        int before = Tracked::destroyed;
-
         UnqPtr<Tracked> ptr(new Tracked(3));
 
         ptr.reset(ptr.get());
 
         check(
-            Tracked::destroyed == before,
-            "reset своим адресом удалил объект"
-        );
-
-        check(
-            ptr.get()->value == 3,
-            "Объект повреждён"
+            ptr.get()->value == 3 && Tracked::alive == 1,
+            "reset своим адресом"
         );
 
         ptr.reset(nullptr);
 
         check(
-            ptr.get() == nullptr,
-            "reset(nullptr) не обнулил владельца"
+            ptr.get() == nullptr && Tracked::alive == 0,
+            "reset nullptr"
         );
     }
 
@@ -221,45 +199,56 @@ namespace tests
         }
 
         check(
-            Tracked::alive == 0,
-            "Объект остался жив"
-        );
-
-        check(
-            Tracked::destroyed == before + 1,
-            "Объект должен удалиться один раз"
+            Tracked::alive == 0
+                && Tracked::destroyed == before + 1,
+            "Деструктор владельца"
         );
     }
 
-    inline void unqSubtype()
+    inline void unqSubtypeMove()
     {
         {
-            UnqPtr<Derived> first(new Derived());
-            UnqPtr<Base> second(first);
+            UnqPtr<UnqDerived> first(new UnqDerived());
+
+            UnqBase* ptr = first.get();
+
+            UnqPtr<UnqBase> second(std::move(first));
 
             check(
-                second.get() != static_cast<Base*>(first.get()),
-                "Нужна отдельная копия базы"
+                first.get() == nullptr && second.get() == ptr,
+                "Перемещение к базовому типу"
             );
 
             check(
-                second.get()->value == 10,
-                "Базовая часть не скопирована"
-            );
-
-            UnqPtr<Base> third(new Base());
-            third = first;
-
-            third.get()->value = 33;
-
-            check(
-                first.get()->value == 10,
-                "Копия базы изменила исходный объект"
+                UnqDerived::alive == 1,
+                "Наследник должен остаться жив"
             );
         }
 
         check(
-            Derived::alive == 0,
+            UnqDerived::alive == 0,
+            "Виртуальный деструктор должен удалить наследника"
+        );
+    }
+
+    inline void unqSubtypeAssign()
+    {
+        {
+            UnqPtr<UnqDerived> first(new UnqDerived());
+            UnqPtr<UnqBase> second(new UnqBase());
+
+            UnqBase* ptr = first.get();
+
+            second = std::move(first);
+
+            check(
+                first.get() == nullptr && second.get() == ptr,
+                "Присваивание с подтипизацией"
+            );
+        }
+
+        check(
+            UnqDerived::alive == 0,
             "Наследник не удалён"
         );
     }
@@ -267,14 +256,13 @@ namespace tests
     inline void unqString()
     {
         UnqPtr<std::string> first(new std::string("hello"));
-        UnqPtr<std::string> second(first);
+        UnqPtr<std::string> second(std::move(first));
 
         second.get()->append("!");
 
         check(
-            *first.get() == "hello"
-                && *second.get() == "hello!",
-            "Копирование строки"
+            first.get() == nullptr && *second.get() == "hello!",
+            "Перемещение строки"
         );
     }
 
@@ -284,7 +272,7 @@ namespace tests
         {
             UnqPtr<Tracked> ptr(new Tracked(1));
 
-            throw std::runtime_error("Тест раскрутки стека");
+            throw std::runtime_error("Тест");
         }
         catch (const std::runtime_error&)
         {
@@ -292,46 +280,7 @@ namespace tests
 
         check(
             Tracked::alive == 0,
-            "RAII не удалил объект при исключении"
-        );
-    }
-
-    inline void unqFailedCopy()
-    {
-        UnqPtr<Tracked> first(new Tracked(10));
-        UnqPtr<Tracked> second(new Tracked(20));
-
-        Tracked* before = second.get();
-        bool caught = false;
-
-        Tracked::failCopy = true;
-
-        try
-        {
-            second = first;
-        }
-        catch (const std::runtime_error&)
-        {
-            caught = true;
-        }
-
-        Tracked::failCopy = false;
-
-        check(
-            caught,
-            "Копирование должно выбросить исключение"
-        );
-
-        check(
-            second.get() == before
-                && second.get()->value == 20,
-            "Утрачен прежний объект"
-        );
-
-        check(
-            first.get()->value == 10
-                && Tracked::alive == 2,
-            "Исходный объект повреждён"
+            "Освобождение при исключении"
         );
     }
 
@@ -345,18 +294,17 @@ namespace tests
         {
             for (int i = 0; i < size; ++i)
             {
-                items[i].reset(new Tracked(i));
+                UnqPtr<Tracked> ptr(new Tracked(i));
+
+                items[i] = std::move(ptr);
+
+                check(
+                    ptr.get() == nullptr,
+                    "Источник должен стать пустым"
+                );
             }
 
-            check(
-                Tracked::alive == size,
-                "Неверное число живых объектов"
-            );
-
-            check(
-                items[size - 1].get()->value == size - 1,
-                "Последний элемент"
-            );
+            check(Tracked::alive == size, "Число объектов");
         }
         catch (...)
         {
@@ -368,55 +316,218 @@ namespace tests
 
         check(
             Tracked::alive == 0,
-            "Массив владельцев оставил объекты"
+            "Массив владельцев не освободил объекты"
+        );
+    }
+
+    inline void unqArrayDefault()
+    {
+        UnqPtr<int[]> first;
+        UnqPtr<int[]> second(nullptr);
+
+        check(
+            first.get() == nullptr && second.get() == nullptr,
+            "Пустые владельцы массива"
+        );
+    }
+
+    inline void unqArrayIndex()
+    {
+        UnqPtr<int[]> ptr(new int[3]{10, 20, 30});
+
+        ptr[1] = 55;
+
+        check(
+            ptr[0] == 10 && ptr[1] == 55 && ptr[2] == 30,
+            "Чтение и запись через []"
+        );
+
+        check(
+            &ptr[1] == ptr.get() + 1,
+            "operator[] должен возвращать исходный элемент"
+        );
+    }
+
+    inline void unqArrayMove()
+    {
+        UnqPtr<int[]> first(new int[3]{1, 2, 3});
+
+        int* ptr = first.get();
+
+        UnqPtr<int[]> second(std::move(first));
+
+        check(
+            first.get() == nullptr
+                && second.get() == ptr
+                && second[2] == 3,
+            "Перемещение массива"
+        );
+    }
+
+    inline void unqArrayAssign()
+    {
+        int before = ArrayTracked::destroyed;
+
+        UnqPtr<ArrayTracked[]> first(new ArrayTracked[3]);
+        UnqPtr<ArrayTracked[]> second(new ArrayTracked[2]);
+
+        ArrayTracked* ptr = first.get();
+
+        second = std::move(first);
+
+        check(
+            first.get() == nullptr && second.get() == ptr,
+            "Передача адреса массива"
+        );
+
+        check(
+            ArrayTracked::destroyed == before + 2
+                && ArrayTracked::alive == 3,
+            "Удаление старого массива"
+        );
+    }
+
+    inline void unqArraySelfMove()
+    {
+        UnqPtr<int[]> ptr(new int[2]{1, 2});
+
+        int* before = ptr.get();
+
+        UnqPtr<int[]>& same = ptr;
+        ptr = std::move(same);
+
+        check(
+            ptr.get() == before && ptr[1] == 2,
+            "Самоперемещение массива"
+        );
+    }
+
+    inline void unqArrayReset()
+    {
+        UnqPtr<ArrayTracked[]> ptr(new ArrayTracked[3]);
+
+        ptr.reset(new ArrayTracked[2]);
+
+        check(ArrayTracked::alive == 2, "Замена массива");
+
+        ptr.reset();
+        ptr.reset(nullptr);
+
+        check(
+            ptr.get() == nullptr && ArrayTracked::alive == 0,
+            "Удаление массива через reset"
+        );
+    }
+
+    inline void unqArrayResetSame()
+    {
+        UnqPtr<int[]> ptr(new int[2]{3, 4});
+
+        int* before = ptr.get();
+
+        ptr.reset(before);
+
+        check(
+            ptr.get() == before && ptr[1] == 4,
+            "reset массива своим адресом"
+        );
+    }
+
+    inline void unqArrayRelease()
+    {
+        UnqPtr<ArrayTracked[]> first(new ArrayTracked[3]);
+
+        ArrayTracked* ptr = first.release();
+
+        bool empty = first.get() == nullptr;
+        bool live = ArrayTracked::alive == 3;
+
+        delete[] ptr;
+
+        check(
+            empty && live && ArrayTracked::alive == 0,
+            "release массива требует delete[] вручную"
+        );
+    }
+
+    inline void unqArrayDestructor()
+    {
+        int before = ArrayTracked::destroyed;
+
+        {
+            UnqPtr<ArrayTracked[]> ptr(new ArrayTracked[4]);
+        }
+
+        check(
+            ArrayTracked::alive == 0
+                && ArrayTracked::destroyed == before + 4,
+            "Деструкторы всех элементов массива"
+        );
+    }
+
+    inline void unqArrayZero()
+    {
+        UnqPtr<ArrayTracked[]> ptr(new ArrayTracked[0]);
+
+        ptr.reset();
+
+        check(
+            ArrayTracked::alive == 0,
+            "Массив нулевой длины"
+        );
+    }
+
+    inline void unqArrayException()
+    {
+        try
+        {
+            UnqPtr<ArrayTracked[]> ptr(new ArrayTracked[3]);
+
+            throw std::runtime_error("Тест");
+        }
+        catch (const std::runtime_error&)
+        {
+        }
+
+        check(
+            ArrayTracked::alive == 0,
+            "Массив должен удалиться при исключении"
         );
     }
 
     inline void runUnqTests()
     {
-        std::cout << "\n=== UnqPtr ===\n";
+        std::cout
+            << "\n=== UnqPtr: перемещение вместо копирования ===\n";
 
         run("Пустой конструктор", unqDefault);
-        run("Конструктор из nullptr", unqNull);
-        run("Создание и чтение", unqValue);
-        run("Глубокое копирование", unqCopy);
-
-        run(
-            "Присваивание и удаление старого объекта",
-            unqAssign
-        );
-
-        run("Присваивание самому себе", unqSelfAssign);
-        run("Копирование пустого владельца", unqCopyEmpty);
-        run("Присваивание пустого владельца", unqAssignEmpty);
-
-        run(
-            "Присваивание непустого владельца пустому",
-            unqAssignToEmpty
-        );
-
-        run("Замена объекта и повторный reset", unqReset);
-        run("reset своим адресом и nullptr", unqResetSame);
-
-        run(
-            "Деструктор удаляет ровно один объект",
-            unqDestructor
-        );
-
-        run(
-            "Копирование и присваивание базовой части",
-            unqSubtype
-        );
-
-        run("Работа со строкой", unqString);
-        run("Освобождение при исключении", unqException);
-
-        run(
-            "Ошибка копирования сохраняет прежнее владение",
-            unqFailedCopy
-        );
-
-        run("Массив из 1000 владельцев", unqMany);
+        run("nullptr", unqNull);
+        run("Создание объекта", unqValue);
+        run("Перемещающий конструктор", unqMove);
+        run("Перемещающее присваивание", unqMoveAssign);
+        run("Самоперемещение", unqSelfMove);
+        run("Перемещение пустого владельца", unqMoveEmpty);
+        run("Перемещение в пустого владельца", unqMoveToEmpty);
+        run("release одиночного объекта", unqRelease);
+        run("reset одиночного объекта", unqReset);
+        run("reset своим адресом", unqResetSame);
+        run("Деструктор одиночного объекта", unqDestructor);
+        run("Перемещение к базовому типу", unqSubtypeMove);
+        run("Перемещающее присваивание к базе", unqSubtypeAssign);
+        run("Перемещение строки", unqString);
+        run("Исключение и RAII", unqException);
+        run("1000 владельцев с перемещением", unqMany);
+        run("Пустой владелец массива", unqArrayDefault);
+        run("Индексация массива", unqArrayIndex);
+        run("Перемещение массива", unqArrayMove);
+        run("Перемещающее присваивание массива", unqArrayAssign);
+        run("Самоперемещение массива", unqArraySelfMove);
+        run("Замена и удаление массива", unqArrayReset);
+        run("reset массива своим адресом", unqArrayResetSame);
+        run("release массива", unqArrayRelease);
+        run("Удаление всех элементов", unqArrayDestructor);
+        run("Массив нулевой длины", unqArrayZero);
+        run("Исключение при владении массивом", unqArrayException);
     }
 }
 
