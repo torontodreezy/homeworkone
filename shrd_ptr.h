@@ -3,9 +3,9 @@
 
 #include "shrd_control.h"
 
+// Дескриптор одиночного объекта.
 template <class T>
 class ShrdPtr {
-    // Нужно для работы между ShrdPtr разных типов.
     template <class U>
     friend class ShrdPtr;
 
@@ -13,7 +13,6 @@ private:
     ShrdControl* control;
     ShrdAccess<T>* access;
 
-    // Отказываемся от текущего владения.
     void release() {
         if (control != nullptr) {
             delete access;
@@ -29,7 +28,6 @@ private:
         access = nullptr;
     }
 
-    // Обмениваем содержимое двух дескрипторов.
     void swap(ShrdPtr& other) {
         ShrdControl* oldControl = control;
         control = other.control;
@@ -43,7 +41,6 @@ private:
 public:
     ShrdPtr() : control(nullptr), access(nullptr) {}
 
-    // Принимаем владение UnqPtr, созданным через new.
     explicit ShrdPtr(UnqPtr<T>* ptr)
         : control(nullptr), access(nullptr) {
         if (ptr != nullptr) {
@@ -68,7 +65,6 @@ public:
         }
     }
 
-    // Копирование дескриптора того же типа.
     ShrdPtr(const ShrdPtr& other)
         : control(other.control), access(nullptr) {
         if (control != nullptr) {
@@ -77,7 +73,6 @@ public:
         }
     }
 
-    // Копирование с переходом к базовому типу.
     template <class U>
     ShrdPtr(const ShrdPtr<U>& other)
         : control(other.control), access(nullptr) {
@@ -94,7 +89,6 @@ public:
         release();
     }
 
-    // Присваивание между одинаковыми типами.
     ShrdPtr& operator=(const ShrdPtr& other) {
         if (this != &other) {
             ShrdPtr copy(other);
@@ -104,7 +98,6 @@ public:
         return *this;
     }
 
-    // Присваивание с переходом к базовому типу.
     template <class U>
     ShrdPtr& operator=(const ShrdPtr<U>& other) {
         ShrdPtr copy(other);
@@ -119,6 +112,79 @@ public:
         }
 
         return access->get();
+    }
+};
+
+// Дескриптор массива.
+template <class T>
+class ShrdPtr<T[]> {
+private:
+    ShrdOwner<T[]>* control;
+
+    void release() {
+        if (control != nullptr) {
+            --control->count;
+
+            if (control->count == 0) {
+                delete control;
+            }
+        }
+
+        control = nullptr;
+    }
+
+public:
+    ShrdPtr() : control(nullptr) {}
+
+    explicit ShrdPtr(UnqPtr<T[]>* ptr)
+        : control(nullptr) {
+        if (ptr != nullptr) {
+            try {
+                control = new ShrdOwner<T[]>(ptr);
+            }
+            catch (...) {
+                delete ptr;
+                throw;
+            }
+        }
+    }
+
+    ShrdPtr(const ShrdPtr& other)
+        : control(other.control) {
+        if (control != nullptr) {
+            ++control->count;
+        }
+    }
+
+    ~ShrdPtr() {
+        release();
+    }
+
+    ShrdPtr& operator=(const ShrdPtr& other) {
+        if (this != &other) {
+            ShrdOwner<T[]>* next = other.control;
+
+            if (next != nullptr) {
+                ++next->count;
+            }
+
+            release();
+            control = next;
+        }
+
+        return *this;
+    }
+
+    T* get() const {
+        if (control == nullptr) {
+            return nullptr;
+        }
+
+        return control->getMaster()->get();
+    }
+
+    T& operator[](std::size_t index) const {
+        return get()[index];
     }
 };
 
