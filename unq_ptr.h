@@ -1,27 +1,71 @@
-//
-// Created by bladerunner on 10/14/26.
-//unique ptr realisation
+#ifndef UNQ_PTR_H
+#define UNQ_PTR_H
 
-#ifndef HOMEWORKONE_3_UNQ_PTR_H
-#define HOMEWORKONE_3_UNQ_PTR_H
+#include <cstddef>
 
+// Владение одним объектом.
 template <class T>
 class UnqPtr {
 private:
     T* pointer;
 
 public:
+    UnqPtr() : pointer(nullptr) {}
+
     explicit UnqPtr(T* ptr) : pointer(ptr) {}
+
+    // Копирование запрещено.
+    UnqPtr(const UnqPtr&) = delete;
+    UnqPtr& operator=(const UnqPtr&) = delete;
+
+    // Перемещение между одинаковыми типами.
+    UnqPtr(UnqPtr&& other) noexcept
+        : pointer(other.release()) {}
+
+    // Перемещение от наследника к базовому типу.
+    template <class U>
+    UnqPtr(UnqPtr<U>&& other) noexcept
+        : pointer(nullptr) {
+        U* ptr = other.get();
+        pointer = ptr;
+
+        other.release();
+    }
+
+    UnqPtr& operator=(UnqPtr&& other) noexcept {
+        if (this != &other) {
+            reset(other.release());
+        }
+
+        return *this;
+    }
+
+    template <class U>
+    UnqPtr& operator=(UnqPtr<U>&& other) noexcept {
+        U* source = other.get();
+        T* ptr = source;
+
+        other.release();
+        reset(ptr);
+
+        return *this;
+    }
+
+    ~UnqPtr() {
+        delete pointer;
+    }
 
     T* get() const {
         return pointer;
     }
 
-    T& operator*() {
-        return *pointer;
-    }
+    // Отдаём адрес без удаления объекта.
+    T* release() {
+        T* ptr = pointer;
+        pointer = nullptr;
 
-    UnqPtr() : pointer(nullptr) {}
+        return ptr;
+    }
 
     void reset() {
         delete pointer;
@@ -34,54 +78,70 @@ public:
             pointer = ptr;
         }
     }
+};
 
-    //подтипизация
+// Владение массивом.
+template <class T>
+class UnqPtr<T[]> {
+private:
+    T* pointer;
+
+public:
+    UnqPtr() : pointer(nullptr) {}
+
+    explicit UnqPtr(T* ptr) : pointer(ptr) {}
+
+    // Не принимаем массивы с другим типом элементов.
     template <class U>
-    UnqPtr(const UnqPtr<U>& other) : pointer(nullptr) {
-        const T* ptr = other.get();
+    UnqPtr(U*) = delete;
 
-        if (ptr != nullptr) {
-            pointer = new T(*ptr);
+    UnqPtr(const UnqPtr&) = delete;
+    UnqPtr& operator=(const UnqPtr&) = delete;
+
+    UnqPtr(UnqPtr&& other) noexcept
+        : pointer(other.release()) {}
+
+    UnqPtr& operator=(UnqPtr&& other) noexcept {
+        if (this != &other) {
+            reset(other.release());
         }
-    }
-
-    template <class U>
-    UnqPtr& operator=(const UnqPtr<U>& other) {
-        const T* source = other.get();
-        T* ptr = nullptr;
-
-        if (source != nullptr) {
-            ptr = new T(*source);
-        }
-
-        delete pointer;
-        pointer = ptr;
 
         return *this;
     }
 
     ~UnqPtr() {
-        delete pointer;
+        delete[] pointer;
     }
 
-    UnqPtr(const UnqPtr& other) : pointer(nullptr) {
-        if (other.pointer != nullptr) {
-            pointer = new T(*other.pointer);
-        }
+    T* get() const {
+        return pointer;
     }
 
-    UnqPtr& operator=(const UnqPtr& other) {
-        if (this != &other) {
-            T* ptr = nullptr;
-            if (other.pointer != nullptr) {
-                ptr = new T(*other.pointer);
-            }
-            delete pointer;
+    T& operator[](std::size_t index) const {
+        return pointer[index];
+    }
+
+    T* release() {
+        T* ptr = pointer;
+        pointer = nullptr;
+
+        return ptr;
+    }
+
+    void reset() {
+        delete[] pointer;
+        pointer = nullptr;
+    }
+
+    void reset(T* ptr) {
+        if (pointer != ptr) {
+            delete[] pointer;
             pointer = ptr;
         }
-        return *this;
     }
+
+    template <class U>
+    void reset(U*) = delete;
 };
 
-
-#endif //HOMEWORKONE_3_UNQ_PTR_H
+#endif

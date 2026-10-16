@@ -1,60 +1,28 @@
-#include <iostream>
-#include "shrd_ptr.h"
+#include "TestUnqPtr.h"
+#include "TestShrdPtr.h"
 
-class Base
+void checkAllDeleted()
 {
-public:
-    int value;
+    tests::check(
+        tests::Tracked::alive == 0,
+        "Остались Tracked"
+    );
 
-    Base(int number) : value(number) {}
-};
-
-class Derived : public Base
-{
-public:
-    Derived(int number) : Base(number)
-    {
-        std::cout << "Объект создан\n";
-    }
-
-    ~Derived()
-    {
-        std::cout << "Объект удалён\n";
-    }
-};
+    tests::check(
+        tests::Derived::alive == 0,
+        "Остались Derived"
+    );
+}
 
 int main()
 {
-    {
-        ShrdPtr<Derived> first(
-            new UnqPtr<Derived>(new Derived(20))
-        );
+    tests::runUnqTests();
+    tests::runShrdTests();
 
-        {
-            ShrdPtr<Derived> second(first);
+    tests::run(
+        "Все отслеживаемые объекты удалены",
+        checkAllDeleted
+    );
 
-            second.get()->value = 50;
-
-            std::cout << "Через first: "
-                      << first.get()->value << '\n';
-
-            ShrdPtr<Base> third;
-            third = second;
-
-            std::cout << "Через Base: "
-                      << third.get()->value << '\n';
-        }
-
-        std::cout << "Другие дескрипторы уничтожены\n";
-
-        std::cout << "first ещё работает: "
-                  << first.get()->value << '\n';
-    }
-
-    std::cout << "Все дескрипторы уничтожены\n";
-
-    ShrdPtr<int> empty;
-
-    std::cout << "Пустой указатель: "
-              << (empty.get() == nullptr) << '\n';
+    return tests::summary();
 }
