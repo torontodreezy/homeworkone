@@ -3,29 +3,46 @@
 
 #include "shrd_control.h"
 
-// Дескриптор одиночного объекта.
+template <class T>
+class WeakPtr;
+
+// Одиночный объект.
 template <class T>
 class ShrdPtr {
     template <class U>
     friend class ShrdPtr;
+
+    template <class U>
+    friend class WeakPtr;
 
 private:
     ShrdControl* control;
     ShrdAccess<T>* access;
 
     void release() {
-        if (control != nullptr) {
-            delete access;
-
-            --control->count;
-
-            if (control->count == 0) {
-                delete control;
-            }
-        }
+        ShrdControl* oldControl = control;
+        ShrdAccess<T>* oldAccess = access;
 
         control = nullptr;
         access = nullptr;
+
+        delete oldAccess;
+
+        if (oldControl != nullptr) {
+            --oldControl->count;
+
+            if (oldControl->count == 0) {
+                // Последний сильный владелец удаляет объект.
+                oldControl->deleteObject();
+
+                // Освобождаем служебную слабую ссылку.
+                --oldControl->weakCount;
+
+                if (oldControl->weakCount == 0) {
+                    delete oldControl;
+                }
+            }
+        }
     }
 
     void swap(ShrdPtr& other) {
@@ -115,22 +132,32 @@ public:
     }
 };
 
-// Дескриптор массива.
+// Массив.
 template <class T>
 class ShrdPtr<T[]> {
+    template <class U>
+    friend class WeakPtr;
+
 private:
     ShrdOwner<T[]>* control;
 
     void release() {
-        if (control != nullptr) {
-            --control->count;
+        ShrdOwner<T[]>* oldControl = control;
+        control = nullptr;
 
-            if (control->count == 0) {
-                delete control;
+        if (oldControl != nullptr) {
+            --oldControl->count;
+
+            if (oldControl->count == 0) {
+                oldControl->deleteObject();
+
+                --oldControl->weakCount;
+
+                if (oldControl->weakCount == 0) {
+                    delete oldControl;
+                }
             }
         }
-
-        control = nullptr;
     }
 
 public:
