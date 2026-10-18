@@ -1,5 +1,7 @@
 #include "TestUnqPtr.h"
 #include "TestShrdPtr.h"
+#include "TestWeakPtr.h"
+#include "TestStandardComparison.h"
 
 void checkAllDeleted()
 {
@@ -22,12 +24,17 @@ void checkAllDeleted()
         tests::UnqDerived::alive == 0,
         "Остались UnqDerived"
     );
+    tests::check(tests::WeakNode::alive == 0, "Остались WeakNode");
+    tests::check(tests::WeakArrayNode::alive == 0, "Остались WeakArrayNode");
+
 }
 
 int main()
 {
     tests::runUnqTests();
     tests::runShrdTests();
+    tests::runWeakTests();
+    tests::runStandardComparisonTests();
 
     tests::run(
         "Все отслеживаемые объекты удалены",
