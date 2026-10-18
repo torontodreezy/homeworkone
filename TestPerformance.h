@@ -212,6 +212,7 @@ namespace benchmark
         if (maximum > 0)
         {
             length = static_cast<int>(value / maximum * 30);
+            if (value > 0 && length == 0) { length = 1; }
         }
 
         std::cout << std::setw(18) << label << " | ";
@@ -224,132 +225,70 @@ namespace benchmark
         std::cout << " " << value << " ms\n";
     }
 
-    inline void runPerformanceTests()
+
+    // Пять замеров: сортируем обычным циклом и берём средний по порядку.
+    inline double median(double values[5])
     {
-        const int sizes[] =
+        for (int i = 0; i < 4; ++i)
         {
-            100,
-            1000,
-            10000,
-            100000,
-            1000000
-        };
-
-        const char* labels[] =
-        {
-            "raw",
-            "UnqPtr",
-            "ShrdPtr",
-            "std::unique_ptr",
-            "std::shared_ptr"
-        };
-
-        double times[5][5];
-        double copies[5][2];
-
-        std::cout
-            << "\nСоздание, чтение и удаление N объектов"
-            << ", миллисекунды\n";
-
-        std::cout << std::setw(10) << "N";
-
-        for (int j = 0; j < 5; ++j)
-        {
-            std::cout << std::setw(18) << labels[j];
-        }
-
-        std::cout << '\n';
-        std::cout << std::fixed << std::setprecision(3);
-
-        for (int i = 0; i < 5; ++i)
-        {
-            times[i][0] = creation<Object*>(sizes[i]);
-            times[i][1] = creation<UnqPtr<Object>>(sizes[i]);
-            times[i][2] = creation<ShrdPtr<Object>>(sizes[i]);
-
-            times[i][3] =
-                creation<std::unique_ptr<Object>>(sizes[i]);
-
-            times[i][4] =
-                creation<std::shared_ptr<Object>>(sizes[i]);
-
-            std::cout << std::setw(10) << sizes[i];
-
-            for (int j = 0; j < 5; ++j)
+            for (int j = i + 1; j < 5; ++j)
             {
-                std::cout << std::setw(18) << times[i][j];
-            }
-
-            std::cout << '\n';
-        }
-
-        std::cout
-            << "\nСоздание и удаление N совладельцев"
-            << ", миллисекунды\n";
-
-        std::cout
-            << std::setw(10) << "N"
-            << std::setw(18) << "ShrdPtr"
-            << std::setw(18) << "std::shared_ptr"
-            << '\n';
-
-        for (int i = 0; i < 5; ++i)
-        {
-            copies[i][0] =
-                copyOwners<ShrdPtr<Object>>(sizes[i]);
-
-            copies[i][1] =
-                copyOwners<std::shared_ptr<Object>>(sizes[i]);
-
-            std::cout
-                << std::setw(10) << sizes[i]
-                << std::setw(18) << copies[i][0]
-                << std::setw(18) << copies[i][1]
-                << '\n';
-        }
-
-        // Используем те же результаты, что и в таблицах.
-        for (int i = 0; i < 5; ++i)
-        {
-            double maximum = 0;
-
-            for (int j = 0; j < 5; ++j)
-            {
-                if (times[i][j] > maximum)
+                if (values[j] < values[i])
                 {
-                    maximum = times[i][j];
+                    double temp = values[i];
+                    values[i] = values[j];
+                    values[j] = temp;
                 }
             }
+        }
+        return values[2];
+    }
 
-            std::cout
-                << "\nГрафик создания: N = "
-                << sizes[i] << '\n';
-
+    // Указатели на две функции позволяют использовать один вывод для всех пар.
+    inline void timeComparison(const char* title,
+                               const char* firstName, const char* secondName,
+                               double (*first)(int), double (*second)(int))
+    {
+        const int sizes[] = {100, 1000, 10000, 100000, 1000000};
+        double times[5][2];
+        std::cout << "\n" << title << "\n";
+        std::cout << "Время, мс. Медиана пяти запусков; меньше — быстрее.\n";
+        std::cout << std::fixed << std::setprecision(6);
+        std::cout << std::setw(10) << "N" << std::setw(20) << firstName
+                  << std::setw(20) << secondName << '\n';
+        for (int i = 0; i < 5; ++i)
+        {
+            double a[5];
+            double b[5];
+            // Прогрев не входит в результат.
+            first(sizes[i]);
+            second(sizes[i]);
             for (int j = 0; j < 5; ++j)
             {
-                timeBar(labels[j], times[i][j], maximum);
+                // Чередуем порядок, чтобы одна сторона не всегда была первой.
+                if (j % 2 == 0)
+                {
+                    a[j] = first(sizes[i]);
+                    b[j] = second(sizes[i]);
+                }
+                else
+                {
+                    b[j] = second(sizes[i]);
+                    a[j] = first(sizes[i]);
+                }
             }
-
-            if (copies[i][0] > copies[i][1])
-            {
-                maximum = copies[i][0];
-            }
-            else
-            {
-                maximum = copies[i][1];
-            }
-
-            std::cout
-                << "\nГрафик совладельцев: N = "
-                << sizes[i] << '\n';
-
-            timeBar("ShrdPtr", copies[i][0], maximum);
-
-            timeBar(
-                "std::shared_ptr",
-                copies[i][1],
-                maximum
-            );
+            times[i][0] = median(a);
+            times[i][1] = median(b);
+            std::cout << std::setw(10) << sizes[i]
+                      << std::setw(20) << times[i][0]
+                      << std::setw(20) << times[i][1] << '\n';
+        }
+        for (int i = 0; i < 5; ++i)
+        {
+            double maximum = times[i][0] > times[i][1] ? times[i][0] : times[i][1];
+            std::cout << "\nN = " << sizes[i] << '\n';
+            timeBar(firstName, times[i][0], maximum);
+            timeBar(secondName, times[i][1], maximum);
         }
     }
 }

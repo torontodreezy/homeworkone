@@ -54,7 +54,7 @@ namespace tests
     inline int summary()
     {
         std::cout << "Тестов пройдено: "
-                  << passed << '/' << total << '\n';
+                  << passed << '/' << total << std::endl;
 
         return passed == total ? 0 : 1;
     }
