@@ -4,17 +4,18 @@
 #include <cstddef>
 #include "unq_ptr.h"
 
-// Общий счётчик дескрипторов.
 class ShrdControl {
 public:
     std::size_t count;
+    std::size_t weakCount;
 
-    ShrdControl() : count(1) {}
+    ShrdControl() : count(1), weakCount(1) {}
+
+    virtual void deleteObject() = 0;
 
     virtual ~ShrdControl() {}
 };
 
-// Хранит ведущий UnqPtr конкретного типа.
 template <class T>
 class ShrdOwner : public ShrdControl {
 private:
@@ -27,12 +28,18 @@ public:
         return pointer;
     }
 
+    void deleteObject() override {
+        UnqPtr<T>* ptr = pointer;
+        pointer = nullptr;
+
+        delete ptr;
+    }
+
     ~ShrdOwner() override {
-        delete pointer;
+        deleteObject();
     }
 };
 
-// Интерфейс доступа к объекту.
 template <class T>
 class ShrdAccess {
 public:
@@ -43,7 +50,6 @@ public:
     virtual ~ShrdAccess() {}
 };
 
-// Доступ через исходный тип ведущего указателя.
 template <class T>
 class ShrdDirectAccess : public ShrdAccess<T> {
 private:
@@ -62,8 +68,6 @@ public:
     }
 };
 
-// Доступ к тому же объекту через базовый тип.
-// T — новый тип, U — исходный.
 template <class T, class U>
 class ShrdConvertedAccess : public ShrdAccess<T> {
 private:
@@ -81,7 +85,6 @@ public:
     ) = delete;
 
     T* get() const override {
-        // Компилятор проверяет преобразование U* в T*.
         return pointer->get();
     }
 
@@ -90,7 +93,6 @@ public:
     }
 
     ~ShrdConvertedAccess() override {
-        // Удаляем только вспомогательный объект доступа.
         delete pointer;
     }
 };
