@@ -80,6 +80,10 @@ public:
     }
 };
 
+
+
+
+
 // Владение массивом.
 template <class T>
 class UnqPtr<T[]> {
