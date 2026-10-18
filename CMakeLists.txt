@@ -20,6 +20,9 @@ add_executable(homeworkone_3
         TestObjects.h
         TestUnqPtr.h
         TestShrdPtr.h
+        weak_ptr.h
+        TestWeakPtr.h
+        TestStandardComparison.h
 )
 
 target_compile_options(homeworkone_3 PRIVATE
@@ -55,6 +58,9 @@ add_executable(pointer_benchmark
         benchmark.cpp
         TestPerformance.h
         TestMemory.h
+        TestWeakPerformance.h
+        TestArrayPerformance.h
+        TestMovePerformance.h
 )
 
 target_compile_options(pointer_benchmark PRIVATE
