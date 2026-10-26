@@ -1,8 +1,8 @@
 #include <exception>
 #include <iostream>
-#include "TestMemory.h"
-#include "TestWeakPerformance.h"
-#include "TestMovePerformance.h"
+#include "Tests/TestMemory.h"
+#include "Tests/TestWeakPerformance.h"
+#include "Tests/TestMovePerformance.h"
 
 using namespace benchmark;
 

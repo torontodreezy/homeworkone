@@ -13,16 +13,16 @@ option(
 
 add_executable(homeworkone_3
         main.cpp
-        unq_ptr.h
-        shrd_ptr.h
-        shrd_control.h
-        TestRunner.h
-        TestObjects.h
-        TestUnqPtr.h
-        TestShrdPtr.h
-        weak_ptr.h
-        TestWeakPtr.h
-        TestStandardComparison.h
+        Realization/unq_ptr.h
+        Realization/shrd_ptr.h
+        Realization/shrd_control.h
+        Tests/TestRunner.h
+        Tests/TestObjects.h
+        Tests/TestUnqPtr.h
+        Tests/TestShrdPtr.h
+        Realization/weak_ptr.h
+        Tests/TestWeakPtr.h
+        Tests/TestStandardComparison.h
 )
 
 target_compile_options(homeworkone_3 PRIVATE
@@ -56,11 +56,11 @@ set_tests_properties(pointer_tests PROPERTIES
 
 add_executable(pointer_benchmark
         benchmark.cpp
-        TestPerformance.h
-        TestMemory.h
-        TestWeakPerformance.h
-        TestArrayPerformance.h
-        TestMovePerformance.h
+        Tests/TestPerformance.h
+        Tests/TestMemory.h
+        Tests/TestWeakPerformance.h
+        Tests/TestArrayPerformance.h
+        Tests/TestMovePerformance.h
 )
 
 target_compile_options(pointer_benchmark PRIVATE

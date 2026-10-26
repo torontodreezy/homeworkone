@@ -1,7 +1,7 @@
-#include "TestUnqPtr.h"
-#include "TestShrdPtr.h"
-#include "TestWeakPtr.h"
-#include "TestStandardComparison.h"
+#include "Tests/TestUnqPtr.h"
+#include "Tests/TestShrdPtr.h"
+#include "Tests/TestWeakPtr.h"
+#include "Tests/TestStandardComparison.h"
 
 void checkAllDeleted()
 {
