@@ -3,6 +3,16 @@
 
 #include "shrd_ptr.h"
 
+// Массивы совместимы только при безопасном преобразовании элементов.
+template<class From, class To>
+struct WeakCompatible : std::bool_constant<
+    !std::is_array_v<From> && !std::is_array_v<To> &&
+    std::is_convertible_v<From*, To*>> {};
+
+template<class From, class To>
+struct WeakCompatible<From[], To[]>
+    : std::bool_constant<std::is_convertible_v<From(*)[], To(*)[]>> {};
+
 template<class T>
 class WeakPtr {
     template<class> friend class WeakPtr;
@@ -18,7 +28,7 @@ class WeakPtr {
     }
 public:
     WeakPtr() noexcept = default;
-    template<class U, typename std::enable_if<shrd_detail::compatible<U,T>::value, int>::type = 0>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr(const ShrdPtr<U>& other) noexcept
         : control(other.control), pointer(other.pointer) {
         if (control) ++control->weakCount;
@@ -27,9 +37,9 @@ public:
         : control(other.control), pointer(other.pointer) {
         if (control) ++control->weakCount;
     }
-    template<class U, typename std::enable_if<shrd_detail::compatible<U,T>::value, int>::type = 0>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr(const WeakPtr<U>& other) noexcept : control(other.control) {
-        // Avoid pointer adjustment through an already destroyed virtual base.
+        // После удаления объекта нельзя вычислять адрес его виртуальной базы.
         if (control) {
             if (control->count) pointer = other.pointer;
             ++control->weakCount;
@@ -45,12 +55,12 @@ public:
         WeakPtr(other).swap(*this);
         return *this;
     }
-    template<class U, typename std::enable_if<shrd_detail::compatible<U,T>::value, int>::type = 0>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr& operator=(const WeakPtr<U>& other) noexcept {
         WeakPtr(other).swap(*this);
         return *this;
     }
-    template<class U, typename std::enable_if<shrd_detail::compatible<U,T>::value, int>::type = 0>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr& operator=(const ShrdPtr<U>& other) noexcept {
         WeakPtr(other).swap(*this);
         return *this;
