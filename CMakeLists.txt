@@ -15,7 +15,6 @@ add_executable(homeworkone_3
         main.cpp
         Realization/unq_ptr.h
         Realization/shrd_ptr.h
-        Realization/shrd_control.h
         Tests/TestRunner.h
         Tests/TestObjects.h
         Tests/TestUnqPtr.h
