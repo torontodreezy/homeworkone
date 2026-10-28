@@ -14,6 +14,7 @@ option(
 add_executable(homeworkone_3
         main.cpp
         Realization/unq_ptr.h
+        Realization/ControlBlock.h
         Realization/shrd_ptr.h
         Tests/TestRunner.h
         Tests/TestObjects.h

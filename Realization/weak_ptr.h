@@ -24,25 +24,25 @@ class WeakPtr {
         ControlBlock* old = control;
         control = nullptr;
         pointer = nullptr;
-        if (old && --old->weakCount == 0) delete old;
+        if (old != nullptr) old->decWeak();
     }
 public:
     WeakPtr() noexcept = default;
     template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr(const ShrdPtr<U>& other) noexcept
         : control(other.control), pointer(other.pointer) {
-        if (control) ++control->weakCount;
+        if (control) control->incWeak();
     }
     WeakPtr(const WeakPtr& other) noexcept
         : control(other.control), pointer(other.pointer) {
-        if (control) ++control->weakCount;
+        if (control) control->incWeak();
     }
     template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr(const WeakPtr<U>& other) noexcept : control(other.control) {
         // После удаления объекта нельзя вычислять адрес его виртуальной базы.
         if (control) {
-            if (control->count) pointer = other.pointer;
-            ++control->weakCount;
+            if (control->useCount()) pointer = other.pointer;
+            control->incWeak();
         }
     }
     WeakPtr(WeakPtr&& other) noexcept
@@ -74,14 +74,14 @@ public:
         std::swap(pointer, other.pointer);
     }
     void reset() noexcept { release(); }
-    std::size_t use_count() const noexcept { return control ? control->count : 0; }
+    std::size_t use_count() const noexcept { return control ? control->useCount() : 0; }
     bool expired() const noexcept { return use_count() == 0; }
     ShrdPtr<T> lock() const noexcept {
         ShrdPtr<T> result;
         if (!expired()) {
             result.control = control;
             result.pointer = pointer;
-            ++control->count;
+            control->incStrong();
         }
         return result;
     }

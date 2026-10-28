@@ -1,70 +1,11 @@
 #ifndef SHRD_PTR_H
 #define SHRD_PTR_H
 
-#include "unq_ptr.h"
+#include "ControlBlock.h"
 #include <cstddef>
-#include <memory>
 #include <stdexcept>
 #include <type_traits>
 #include <utility>
-
-// Общий блок владения. Адрес для доступа хранится отдельно в ShrdPtr.
-struct ControlBlock {
-    using Deleter = void (*)(void*);
-
-    std::size_t count = 1;
-    // Одна служебная слабая ссылка существует, пока есть сильные владельцы.
-    std::size_t weakCount = 1;
-    void* owner;
-    Deleter deleter;
-
-    ControlBlock(void* owner, Deleter deleter) noexcept
-        : owner(owner), deleter(deleter) {}
-
-    template<class U>
-    static void deleteOwner(void* owner) {
-        // Деструктор UnqPtr удаляет объект или массив, затем удаляется обёртка.
-        delete static_cast<UnqPtr<U>*>(owner);
-    }
-
-    template<class U>
-    static ControlBlock* create(UnqPtr<U>* owner) {
-        if (owner == nullptr) return nullptr;
-        try {
-            return new ControlBlock(owner, deleteOwner<U>);
-        } catch (...) {
-            delete owner;
-            throw;
-        }
-    }
-
-    template<class U>
-    static ControlBlock* fromRaw(typename std::remove_extent_t<U>* pointer) {
-        if (pointer == nullptr) return nullptr;
-        // Защита объекта, если выделение памяти под обёртку не удастся.
-        std::unique_ptr<U> guard(pointer);
-        auto* owner = new UnqPtr<U>(pointer);
-        guard.release();
-        return create(owner);
-    }
-
-    void addStrong() noexcept { ++count; }
-    void addWeak() noexcept { ++weakCount; }
-
-    void releaseWeak() noexcept {
-        if (--weakCount == 0) delete this;
-    }
-
-    void releaseStrong() noexcept {
-        if (--count == 0) {
-            void* oldOwner = owner;
-            owner = nullptr;
-            // Служебная ссылка защищает блок при удалении WeakPtr внутри объекта.
-            deleter(oldOwner);
-            releaseWeak();
-        }
-    }
-};
 
 template<class T> class WeakPtr;
 template<class T> class ShrdPtr;
@@ -89,7 +30,7 @@ class ShrdPtr {
         ControlBlock* old = control;
         control = nullptr;
         pointer = nullptr;
-        if (old != nullptr) old->releaseStrong();
+        if (old != nullptr) old->decStrong();
     }
 
 public:
@@ -102,14 +43,14 @@ public:
 
     ShrdPtr(const ShrdPtr& other) noexcept
         : control(other.control), pointer(other.pointer) {
-        if (control != nullptr) control->addStrong();
+        if (control != nullptr) control->incStrong();
     }
 
     // Разрешаем только безопасное преобразование адресов.
     template<class U, class = std::enable_if_t<std::is_convertible_v<U*, T*>>>
     ShrdPtr(const ShrdPtr<U>& other) noexcept
         : control(other.control), pointer(other.pointer) {
-        if (control != nullptr) control->addStrong();
+        if (control != nullptr) control->incStrong();
     }
 
     ShrdPtr(ShrdPtr&& other) noexcept
@@ -149,7 +90,7 @@ public:
     T* get() const noexcept { return pointer; }
     explicit operator bool() const noexcept { return pointer != nullptr; }
     std::size_t use_count() const noexcept {
-        return control == nullptr ? 0 : control->count;
+        return control == nullptr ? 0 : control->useCount();
     }
 
     T& operator*() const {
@@ -194,7 +135,7 @@ class ShrdPtr<T[]> {
         ControlBlock* old = control;
         control = nullptr;
         pointer = nullptr;
-        if (old != nullptr) old->releaseStrong();
+        if (old != nullptr) old->decStrong();
     }
 
 public:
@@ -207,14 +148,14 @@ public:
 
     ShrdPtr(const ShrdPtr& other) noexcept
         : control(other.control), pointer(other.pointer) {
-        if (control != nullptr) control->addStrong();
+        if (control != nullptr) control->incStrong();
     }
 
     // Разрешаем только безопасное преобразование адресов.
     template<class U, class = std::enable_if_t<std::is_convertible_v<U(*)[], T(*)[]>>>
     ShrdPtr(const ShrdPtr<U[]>& other) noexcept
         : control(other.control), pointer(other.pointer) {
-        if (control != nullptr) control->addStrong();
+        if (control != nullptr) control->incStrong();
     }
 
     ShrdPtr(ShrdPtr&& other) noexcept
@@ -254,7 +195,7 @@ public:
     T* get() const noexcept { return pointer; }
     explicit operator bool() const noexcept { return pointer != nullptr; }
     std::size_t use_count() const noexcept {
-        return control == nullptr ? 0 : control->count;
+        return control == nullptr ? 0 : control->useCount();
     }
 
     T& operator[](std::size_t index) const { return pointer[index]; }
