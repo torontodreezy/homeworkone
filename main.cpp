@@ -27,8 +27,7 @@ void checkAllDeleted()
     tests::check(tests::WeakNode::alive == 0, "Остались WeakNode");
     tests::check(tests::WeakArrayNode::alive == 0, "Остались WeakArrayNode");
 
-}
-
+}//void* исправить, дублирование
 int main()
 {
     tests::runUnqTests();

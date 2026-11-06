@@ -14,9 +14,9 @@ private:
 
     void* ownerPointer;
     DeleteFunction* deleteFunction;
-    std::size_t strongCount = 1;
+    size_t strongCount = 1;
 
-    std::size_t weakCount = 1;
+    size_t weakCount = 1;
 
     ControlBlock(void* owner, DeleteFunction* destroy) noexcept
         : ownerPointer(owner), deleteFunction(destroy) {}
@@ -88,7 +88,7 @@ public:
         }
     }
 
-    std::size_t useCount() const noexcept {
+     size_t useCount() const noexcept {
         return strongCount;
     }
 

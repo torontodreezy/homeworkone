@@ -3,7 +3,7 @@
 
 #include "shrd_ptr.h"
 
-// Массивы совместимы только при безопасном преобразовании элементов.
+
 template<class From, class To>
 struct WeakCompatible : std::bool_constant<
     !std::is_array_v<From> && !std::is_array_v<To> &&
