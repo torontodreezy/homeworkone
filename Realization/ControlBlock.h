@@ -31,6 +31,11 @@ public:
     static ControlBlock* fromRaw(std::remove_extent_t<T>* pointer);
 
     void incStrong() noexcept { ++strongCount; }
+    bool tryIncStrong() noexcept {
+        if (strongCount == 0) return false;
+        ++strongCount;
+        return true;
+    }
     void incWeak() noexcept { ++weakCount; }
 
     void decWeak() noexcept {

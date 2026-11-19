@@ -92,9 +92,8 @@ public:
 
     ShrdPtr<T> lock() const noexcept {
         ShrdPtr<T> result;
-        if (expired()) return result;
+        if (control == nullptr || !control->tryIncStrong()) return result;
 
-        control->incStrong();
         result.control = control;
         result.pointer = pointer;
         return result;

@@ -63,7 +63,7 @@ public:
         return *this;
     }
 
-    //
+    //перенести в control block
     template <class U>
     UnqPtr& operator=(UnqPtr<U>&& other) noexcept {
         U* source = other.get();
