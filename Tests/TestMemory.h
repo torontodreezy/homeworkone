@@ -22,21 +22,20 @@ namespace benchmark
                                  std::size_t a, std::size_t b,
                                  std::size_t firstFixed = 0, std::size_t secondFixed = 0)
     {
+        const std::size_t sizes[] = {100, 1000, 10000, 100000, 1000000};
         std::cout << "\n" << title << "\n";
         std::cout << std::setw(10) << "N" << std::setw(20) << first
                   << std::setw(20) << second << '\n';
-        std::size_t left = 0;
-        std::size_t right = 0;
-        for (int size : workloadSizes)
+        for (int i = 0; i < 5; ++i)
         {
-            left = firstFixed + size * a;
-            right = secondFixed + size * b;
-            std::cout << std::setw(10) << size
-                      << std::setw(20) << left
-                      << std::setw(20) << right << '\n';
+            std::cout << std::setw(10) << sizes[i]
+                      << std::setw(20) << firstFixed + sizes[i] * a
+                      << std::setw(20) << secondFixed + sizes[i] * b << '\n';
         }
+        std::size_t left = firstFixed + sizes[4] * a;
+        std::size_t right = secondFixed + sizes[4] * b;
         std::size_t maximum = left > right ? left : right;
-        std::cout << "График памяти при N = " << largestWorkload << ":\n";
+        std::cout << "График памяти при N = 1000000:\n";
         memoryBar(first, left, maximum);
         memoryBar(second, right, maximum);
     }
@@ -67,14 +66,16 @@ namespace benchmark
         memoryComparison("Память N самих указателей на массивы, байты (без массивов и блоков)",
                          "ShrdPtr<T[]>", other, sizeof(ShrdPtr<int[]>),
                          standard ? sizeof(std::shared_ptr<int[]>) : sizeof(int*));
-        constexpr std::size_t scalarExtra = sizeof(TypedControlBlock<Object>);
-        constexpr std::size_t arrayExtra = sizeof(TypedControlBlock<int[]>);
+        std::size_t scalarExtra = sizeof(UnqPtr<Object>) + sizeof(ControlBlock)
+                                + 0;
+        std::size_t arrayExtra = sizeof(UnqPtr<int[]>) + sizeof(ControlBlock);
         std::cout << "\nДополнительно у нашей реализации, сверх самого ShrdPtr:\n"
                   << "Один независимый объект: объект " << sizeof(Object)
-                  << " + блок управления " << scalarExtra << " байт.\n"
+                  << " + служебные блоки " << scalarExtra << " байт.\n"
                   << "Один массив: N * " << sizeof(int)
-                  << " + блок управления " << arrayExtra << " байт.\n"
-                  << "Копии ShrdPtr используют существующий блок.\n";
+                  << " + служебные блоки " << arrayExtra << " байт.\n"
+                  << "Копия ShrdPtr<Object> дополнительно выделяет "
+                  << 0 << " байт; копия ShrdPtr<int[]> — 0.\n";
         if (standard)
         {
             std::cout << "У STL также есть блок управления; его полный размер здесь не измеряется.\n"
@@ -100,10 +101,11 @@ namespace benchmark
         memoryComparison("Память N самих слабых указателей на массив, байты (без блоков)",
                          "WeakPtr<T[]>", "std::weak_ptr[]",
                          sizeof(WeakPtr<int[]>), sizeof(std::weak_ptr<int[]>));
-        std::cout << "\nСлабый наблюдатель использует существующий блок.\n"
+        std::cout << "\nНаш WeakPtr<Object> дополнительно выделяет на каждый наблюдатель "
+                  << 0 << " байт; WeakPtr<int[]> — 0.\n"
                   << "Общий блок ControlBlock остаётся до удаления последнего слабого указателя: "
-                  << sizeof(TypedControlBlock<Object>) << " байт для объекта, "
-                  << sizeof(TypedControlBlock<int[]>) << " байт для массива.\n"
+                  << sizeof(ControlBlock) << " байт для объекта, "
+                  << sizeof(ControlBlock) << " байт для массива.\n"
                   << "Размер общего блока STL здесь не измеряется.\n"
                   << "Слабые указатели не владеют данными; память живого объекта считается у ShrdPtr.\n";
     }

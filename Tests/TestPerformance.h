@@ -10,10 +10,6 @@
 #include "../Realization/shrd_ptr.h"
 
 namespace benchmark {
-    inline constexpr int largestWorkload = 1000000;
-    inline constexpr int workloadSizes[] = {100, 1000, 10000, 100000, largestWorkload};
-    inline constexpr int repeatCount = 5;
-
     struct Object {
         int value;
         double data[4];
@@ -37,7 +33,17 @@ namespace benchmark {
     }
 
     inline void fill(ShrdPtr<Object>& ptr, int value) {
-        ptr = makeShrd<Object>(value);
+        UnqPtr<Object>* master = new UnqPtr<Object>();
+
+        try {
+            master->reset(new Object(value));
+        }
+        catch (...) {
+            delete master;
+            throw;
+        }
+
+        ptr = ShrdPtr<Object>(master);
     }
 
     inline void fill(std::unique_ptr<Object>& ptr, int value) {
@@ -191,9 +197,9 @@ namespace benchmark {
     }
 
     // Сортируем пять результатов и берём средний по порядку.
-    inline double median(double (&values)[repeatCount]) {
-        for (int i = 0; i < repeatCount - 1; ++i) {
-            for (int j = i + 1; j < repeatCount; ++j) {
+    inline double median(double values[5]) {
+        for (int i = 0; i < 4; ++i) {
+            for (int j = i + 1; j < 5; ++j) {
                 if (values[j] < values[i]) {
                     double temp = values[i];
                     values[i] = values[j];
@@ -202,7 +208,7 @@ namespace benchmark {
             }
         }
 
-        return values[repeatCount / 2];
+        return values[2];
     }
 
     // Один способ вывода для всех пар указателей.
@@ -213,12 +219,20 @@ namespace benchmark {
         double (*first)(int),
         double (*second)(int)
     ) {
-        double firstMedian = 0;
-        double secondMedian = 0;
+        const int sizes[] =
+            {
+            100,
+            1000,
+            10000,
+            100000,
+            1000000
+            };
+
+        double times[5][2];
 
         std::cout << "\n" << title << "\n";
         std::cout
-            << "Время, мс. Число запусков для медианы: " << repeatCount << ".\n";
+            << "Время, мс. Медиана пяти запусков; меньше — быстрее.\n";
 
         std::cout << std::fixed << std::setprecision(6);
 
@@ -228,40 +242,49 @@ namespace benchmark {
             << std::setw(20) << secondName
             << '\n';
 
-        for (int size : workloadSizes) {
-            double firstTimes[repeatCount];
-            double secondTimes[repeatCount];
+        for (int i = 0; i < 5; ++i) {
+            double a[5];
+            double b[5];
 
             // Прогрев не входит в результат.
-            first(size);
-            second(size);
+            first(sizes[i]);
+            second(sizes[i]);
 
-            for (int j = 0; j < repeatCount; ++j) {
+            for (int j = 0; j < 5; ++j) {
                 // Чередуем порядок запуска.
                 if (j % 2 == 0) {
-                    firstTimes[j] = first(size);
-                    secondTimes[j] = second(size);
+                    a[j] = first(sizes[i]);
+                    b[j] = second(sizes[i]);
                 }
                 else {
-                    secondTimes[j] = second(size);
-                    firstTimes[j] = first(size);
+                    b[j] = second(sizes[i]);
+                    a[j] = first(sizes[i]);
                 }
             }
 
-            firstMedian = median(firstTimes);
-            secondMedian = median(secondTimes);
+            times[i][0] = median(a);
+            times[i][1] = median(b);
 
             std::cout
-                << std::setw(10) << size
-                << std::setw(20) << firstMedian
-                << std::setw(20) << secondMedian
+                << std::setw(10) << sizes[i]
+                << std::setw(20) << times[i][0]
+                << std::setw(20) << times[i][1]
                 << '\n';
         }
 
-        double maximum = firstMedian > secondMedian ? firstMedian : secondMedian;
-        std::cout << "\nГрафик: N = " << largestWorkload << '\n';
-        timeBar(firstName, firstMedian, maximum);
-        timeBar(secondName, secondMedian, maximum);
+        // В таблице остаются все размеры нагрузки.
+        // График показываем только для миллиона.
+        int i = 4;
+
+        double maximum =
+            times[i][0] > times[i][1]
+                ? times[i][0]
+                : times[i][1];
+
+        std::cout << "\nГрафик: N = " << sizes[i] << '\n';
+
+        timeBar(firstName, times[i][0], maximum);
+        timeBar(secondName, times[i][1], maximum);
     }
 }
 

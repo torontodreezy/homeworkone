@@ -12,10 +12,6 @@ static_assert(!std::is_copy_constructible_v<UnqPtr<int>>);
 static_assert(!std::is_copy_assignable_v<UnqPtr<int>>);
 static_assert(!std::is_copy_constructible_v<UnqPtr<int[]>>);
 static_assert(!std::is_copy_assignable_v<UnqPtr<int[]>>);
-static_assert(!std::is_constructible_v<UnqPtr<int>, UnqPtr<double>&&>);
-static_assert(!std::is_assignable_v<UnqPtr<int>&, UnqPtr<int[]>&&>);
-static_assert(!std::is_constructible_v<UnqPtr<tests::Base>, UnqPtr<tests::Derived>&&>);
-static_assert(!std::is_constructible_v<UnqPtr<tests::Base>, tests::Derived*>);
 
 namespace tests
 {

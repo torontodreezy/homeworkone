@@ -16,7 +16,7 @@ inline void weakDefault()
 }
 inline void weakFromShared()
 {
-    ShrdPtr<int> first(UnqPtr<int>(new int(10)));
+    ShrdPtr<int> first(new UnqPtr<int>(new int(10)));
     WeakPtr<int> weak(first);
     check(!weak.expired() && weak.use_count() == 1, "WeakPtr не увеличивает число сильных владельцев");
     {
@@ -27,7 +27,7 @@ inline void weakFromShared()
 }
 inline void weakCopy()
 {
-    ShrdPtr<int> strong(UnqPtr<int>(new int(7)));
+    ShrdPtr<int> strong(new UnqPtr<int>(new int(7)));
     WeakPtr<int> first(strong);
     WeakPtr<int> second(first);
     check(second.use_count() == 1, "Копирование слабого указателя не создаёт сильного владельца");
@@ -36,8 +36,8 @@ inline void weakCopy()
 }
 inline void weakAssign()
 {
-    ShrdPtr<int> first(UnqPtr<int>(new int(1)));
-    ShrdPtr<int> second(UnqPtr<int>(new int(2)));
+    ShrdPtr<int> first(new UnqPtr<int>(new int(1)));
+    ShrdPtr<int> second(new UnqPtr<int>(new int(2)));
     WeakPtr<int> weak(first);
     WeakPtr<int> other(second);
     weak = other;
@@ -47,7 +47,7 @@ inline void weakAssign()
 }
 inline void weakSelfAssign()
 {
-    ShrdPtr<int> strong(UnqPtr<int>(new int(5)));
+    ShrdPtr<int> strong(new UnqPtr<int>(new int(5)));
     WeakPtr<int> weak(strong);
     WeakPtr<int>& same = weak;
     weak = same;
@@ -56,7 +56,7 @@ inline void weakSelfAssign()
 }
 inline void weakMove()
 {
-    ShrdPtr<int> strong(UnqPtr<int>(new int(5)));
+    ShrdPtr<int> strong(new UnqPtr<int>(new int(5)));
     WeakPtr<int> first(strong);
     WeakPtr<int> second(std::move(first));
     check(first.expired() && first.use_count() == 0, "Источник перемещения должен стать пустым");
@@ -64,7 +64,7 @@ inline void weakMove()
 }
 inline void weakMoveAssign()
 {
-    ShrdPtr<int> strong(UnqPtr<int>(new int(5)));
+    ShrdPtr<int> strong(new UnqPtr<int>(new int(5)));
     WeakPtr<int> first(strong);
     WeakPtr<int> second;
     second = std::move(first);
@@ -76,7 +76,7 @@ inline void weakExpired()
 {
     WeakPtr<Tracked> weak;
     {
-        ShrdPtr<Tracked> strong(UnqPtr<Tracked>(new Tracked(1)));
+        ShrdPtr<Tracked> strong(new UnqPtr<Tracked>(new Tracked(1)));
         weak = strong;
     }
     check(Tracked::alive == 0, "WeakPtr не должен удерживать объект");
@@ -88,7 +88,7 @@ inline void weakLockLifetime()
     WeakPtr<Tracked> weak;
     ShrdPtr<Tracked> locked;
     {
-        ShrdPtr<Tracked> strong(UnqPtr<Tracked>(new Tracked(8)));
+        ShrdPtr<Tracked> strong(new UnqPtr<Tracked>(new Tracked(8)));
         weak = strong;
         locked = weak.lock();
         check(weak.use_count() == 2, "lock создаёт сильного владельца");
@@ -99,7 +99,7 @@ inline void weakLockLifetime()
 }
 inline void weakReset()
 {
-    ShrdPtr<Tracked> strong(UnqPtr<Tracked>(new Tracked(2)));
+    ShrdPtr<Tracked> strong(new UnqPtr<Tracked>(new Tracked(2)));
     WeakPtr<Tracked> weak(strong);
     weak.reset();
     weak.reset();
@@ -111,7 +111,7 @@ inline void weakEmptyShared()
     ShrdPtr<Derived> empty;
     WeakPtr<Base> weak(empty);
     check(weak.expired() && weak.lock().get() == nullptr, "Пустой ShrdPtr и подтипизация");
-    ShrdPtr<Base> strong(UnqPtr<Base>(new Base()));
+    ShrdPtr<Base> strong(new UnqPtr<Base>(new Base()));
     weak = strong;
     weak = empty;
     check(weak.expired(), "Присваивание пустого ShrdPtr");
@@ -120,7 +120,7 @@ inline void weakExpiredCopy()
 {
     WeakPtr<int> first;
     {
-        ShrdPtr<int> strong(UnqPtr<int>(new int(9)));
+        ShrdPtr<int> strong(new UnqPtr<int>(new int(9)));
         first = strong;
     }
     WeakPtr<int> second(first);
@@ -134,7 +134,7 @@ inline void weakSubtypeShared()
 {
     WeakPtr<Base> weak;
     {
-        ShrdPtr<Derived> strong(UnqPtr<Derived>(new Derived()));
+        ShrdPtr<Derived> strong(new UnqPtr<Derived>(new Derived()));
         weak = strong;
         auto locked = weak.lock();
         check(locked.get() == static_cast<Base*>(strong.get()), "Преобразование доступа к базе");
@@ -147,7 +147,7 @@ inline void weakSubtypeWeak()
 {
     WeakPtr<Derived> first;
     {
-        ShrdPtr<Derived> strong(UnqPtr<Derived>(new Derived()));
+        ShrdPtr<Derived> strong(new UnqPtr<Derived>(new Derived()));
         first = strong;
         WeakPtr<Base> second(first);
         WeakPtr<Base> third;
@@ -160,14 +160,14 @@ inline void weakSubtypeWeak()
 }
 inline void weakMultipleInheritance()
 {
-    ShrdPtr<Multiple> strong(UnqPtr<Multiple>(new Multiple()));
+    ShrdPtr<Multiple> strong(new UnqPtr<Multiple>(new Multiple()));
     WeakPtr<Base> weak(strong);
     auto locked = weak.lock();
     check(locked.get() == static_cast<Base*>(strong.get()), "Смещение адреса базы при множественном наследовании");
 }
 inline void weakSubtypeChain()
 {
-    ShrdPtr<Leaf> strong(UnqPtr<Leaf>(new Leaf()));
+    ShrdPtr<Leaf> strong(new UnqPtr<Leaf>(new Leaf()));
     WeakPtr<Leaf> first(strong);
     WeakPtr<Middle> second(first);
     WeakPtr<Root> third(second);
@@ -178,7 +178,7 @@ inline void weakException()
     WeakPtr<Tracked> weak;
     try
     {
-        ShrdPtr<Tracked> strong(UnqPtr<Tracked>(new Tracked(1)));
+        ShrdPtr<Tracked> strong(new UnqPtr<Tracked>(new Tracked(1)));
         weak = strong;
         throw std::runtime_error("Тест");
     }
@@ -192,7 +192,7 @@ inline void weakMany()
     try
     {
         {
-            ShrdPtr<Tracked> strong(UnqPtr<Tracked>(new Tracked(1)));
+            ShrdPtr<Tracked> strong(new UnqPtr<Tracked>(new Tracked(1)));
             for (int i = 0; i < size; ++i) { items[i] = strong; }
             check(items[size - 1].use_count() == 1, "1000 WeakPtr не создают сильных владельцев");
         }
@@ -216,7 +216,7 @@ struct WeakNode
 inline void weakSelfReference()
 {
     {
-        ShrdPtr<WeakNode> node(UnqPtr<WeakNode>(new WeakNode()));
+        ShrdPtr<WeakNode> node(new UnqPtr<WeakNode>(new WeakNode()));
         node.get()->previous = node;
     }
     check(WeakNode::alive == 0, "Слабая ссылка на себя не должна мешать удалению");
@@ -224,8 +224,8 @@ inline void weakSelfReference()
 inline void weakBreakCycle()
 {
     {
-        ShrdPtr<WeakNode> first(UnqPtr<WeakNode>(new WeakNode()));
-        ShrdPtr<WeakNode> second(UnqPtr<WeakNode>(new WeakNode()));
+        ShrdPtr<WeakNode> first(new UnqPtr<WeakNode>(new WeakNode()));
+        ShrdPtr<WeakNode> second(new UnqPtr<WeakNode>(new WeakNode()));
         first.get()->next = second;
         second.get()->previous = first;
     }
@@ -239,7 +239,7 @@ inline void weakArrayDefault()
 }
 inline void weakArrayLock()
 {
-    ShrdPtr<int[]> strong(UnqPtr<int[]>(new int[3]{1, 2, 3}));
+    ShrdPtr<int[]> strong(new UnqPtr<int[]>(new int[3]{1, 2, 3}));
     WeakPtr<int[]> weak(strong);
     auto locked = weak.lock();
     locked[1] = 55;
@@ -250,7 +250,7 @@ inline void weakArrayExpired()
 {
     WeakPtr<ArrayTracked[]> weak;
     {
-        ShrdPtr<ArrayTracked[]> strong(UnqPtr<ArrayTracked[]>(new ArrayTracked[3]));
+        ShrdPtr<ArrayTracked[]> strong(new UnqPtr<ArrayTracked[]>(new ArrayTracked[3]));
         weak = strong;
     }
     check(ArrayTracked::alive == 0 && weak.expired(), "Все элементы должны удалиться, несмотря на WeakPtr");
@@ -261,7 +261,7 @@ inline void weakArrayLifetime()
     WeakPtr<ArrayTracked[]> weak;
     ShrdPtr<ArrayTracked[]> locked;
     {
-        ShrdPtr<ArrayTracked[]> strong(UnqPtr<ArrayTracked[]>(new ArrayTracked[3]));
+        ShrdPtr<ArrayTracked[]> strong(new UnqPtr<ArrayTracked[]>(new ArrayTracked[3]));
         weak = strong;
         locked = weak.lock();
     }
@@ -271,7 +271,7 @@ inline void weakArrayLifetime()
 }
 inline void weakArrayCopyAssign()
 {
-    ShrdPtr<int[]> strong(UnqPtr<int[]>(new int[2]{3, 4}));
+    ShrdPtr<int[]> strong(new UnqPtr<int[]>(new int[2]{3, 4}));
     WeakPtr<int[]> first(strong);
     WeakPtr<int[]> second(first);
     WeakPtr<int[]> third;
@@ -284,7 +284,7 @@ inline void weakArrayCopyAssign()
 }
 inline void weakArrayMove()
 {
-    ShrdPtr<int[]> strong(UnqPtr<int[]>(new int[2]{3, 4}));
+    ShrdPtr<int[]> strong(new UnqPtr<int[]>(new int[2]{3, 4}));
     WeakPtr<int[]> first(strong);
     WeakPtr<int[]> second(std::move(first));
     WeakPtr<int[]> third;
@@ -296,7 +296,7 @@ inline void weakArrayMove()
 }
 inline void weakArrayReset()
 {
-    ShrdPtr<ArrayTracked[]> strong(UnqPtr<ArrayTracked[]>(new ArrayTracked[2]));
+    ShrdPtr<ArrayTracked[]> strong(new UnqPtr<ArrayTracked[]>(new ArrayTracked[2]));
     WeakPtr<ArrayTracked[]> weak(strong);
     weak.reset();
     weak.reset();
@@ -312,7 +312,7 @@ struct WeakArrayNode
 inline void weakArraySelfReference()
 {
     {
-        ShrdPtr<WeakArrayNode[]> strong(UnqPtr<WeakArrayNode[]>(new WeakArrayNode[2]));
+        ShrdPtr<WeakArrayNode[]> strong(new UnqPtr<WeakArrayNode[]>(new WeakArrayNode[2]));
         strong[0].self = strong;
         strong[1].self = strong;
     }
@@ -323,7 +323,7 @@ inline void weakArrayException()
     WeakPtr<ArrayTracked[]> weak;
     try
     {
-        ShrdPtr<ArrayTracked[]> strong(UnqPtr<ArrayTracked[]>(new ArrayTracked[2]));
+        ShrdPtr<ArrayTracked[]> strong(new UnqPtr<ArrayTracked[]>(new ArrayTracked[2]));
         weak = strong;
         throw std::runtime_error("Тест");
     }
@@ -332,11 +332,11 @@ inline void weakArrayException()
 }
 inline void weakEmptyMaster()
 {
-    ShrdPtr<int> single(UnqPtr<int>{});
+    ShrdPtr<int> single(new UnqPtr<int>());
     WeakPtr<int> first(single);
     check(!first.expired() && first.use_count() == 1, "Существует сильный владелец пустого UnqPtr");
     check(first.lock().get() == nullptr, "Пустой ведущий указатель не содержит объекта");
-    ShrdPtr<int[]> array(UnqPtr<int[]>{});
+    ShrdPtr<int[]> array(new UnqPtr<int[]>());
     WeakPtr<int[]> second(array);
     check(!second.expired() && second.use_count() == 1, "Существует владелец пустого массива");
     check(second.lock().get() == nullptr, "Пустой ведущий указатель массива");

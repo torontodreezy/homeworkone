@@ -3,6 +3,15 @@
 
 #include "shrd_ptr.h"
 
+template<class From, class To>
+struct WeakCompatible : std::bool_constant<
+    !std::is_array_v<From> && !std::is_array_v<To> &&
+    std::is_convertible_v<From*, To*>> {};
+
+template<class From, class To>
+struct WeakCompatible<From[], To[]>
+    : std::bool_constant<std::is_convertible_v<From(*)[], To(*)[]>> {};
+
 template<class T>
 class WeakPtr {
     template<class> friend class WeakPtr;
@@ -23,8 +32,7 @@ class WeakPtr {
 public:
     WeakPtr() noexcept = default;
 
-    template<class U>
-        requires pointer_detail::Compatible<U, T>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr(const ShrdPtr<U>& other) noexcept
         : control(other.control), pointer(other.pointer) {
         if (control != nullptr) control->incWeak();
@@ -35,8 +43,7 @@ public:
         if (control != nullptr) control->incWeak();
     }
 
-    template<class U>
-        requires pointer_detail::Compatible<U, T>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr(const WeakPtr<U>& other) noexcept : control(other.control) {
         // После удаления объекта нельзя вычислять адрес его виртуальной базы.
         if (control != nullptr) {
@@ -56,14 +63,12 @@ public:
         WeakPtr(other).swap(*this);
         return *this;
     }
-    template<class U>
-        requires pointer_detail::Compatible<U, T>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr& operator=(const WeakPtr<U>& other) noexcept {
         WeakPtr(other).swap(*this);
         return *this;
     }
-    template<class U>
-        requires pointer_detail::Compatible<U, T>
+    template<class U, class = std::enable_if_t<WeakCompatible<U, T>::value>>
     WeakPtr& operator=(const ShrdPtr<U>& other) noexcept {
         WeakPtr(other).swap(*this);
         return *this;
