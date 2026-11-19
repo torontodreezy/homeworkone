@@ -3,8 +3,6 @@
 
 #include "unq_ptr.h"
 #include <cstddef>
-#include <memory>
-#include <type_traits>
 
 template<class T> class TypedControlBlock;
 
@@ -25,10 +23,7 @@ public:
     ControlBlock& operator=(const ControlBlock&) = delete;
 
     template<class T>
-    static ControlBlock* create(UnqPtr<T>* owner);
-
-    template<class T>
-    static ControlBlock* fromRaw(std::remove_extent_t<T>* pointer);
+    static ControlBlock* create(UnqPtr<T>&& owner);
 
     void incStrong() noexcept { ++strongCount; }
     bool tryIncStrong() noexcept {
@@ -55,36 +50,21 @@ public:
 // Типизированная часть знает, как удалить исходного владельца объекта или массива.
 template<class T>
 class TypedControlBlock final : public ControlBlock {
-    UnqPtr<T>* owner;
+    UnqPtr<T> owner;
 
     void destroyOwner() noexcept override {
-        delete owner;
-        owner = nullptr;
+        owner.reset();
     }
 
 public:
-    explicit TypedControlBlock(UnqPtr<T>* owner) noexcept : owner(owner) {}
+    explicit TypedControlBlock(UnqPtr<T>&& source) noexcept
+        : owner(std::move(source)) {}
 };
 
 template<class T>
-ControlBlock* ControlBlock::create(UnqPtr<T>* owner) {
-    if (owner == nullptr) return nullptr;
-
-    // При ошибке выделения памяти владелец и его объект будут удалены.
-    std::unique_ptr<UnqPtr<T>> guard(owner);
-    ControlBlock* block = new TypedControlBlock<T>(owner);
-    guard.release();
-    return block;
-}
-
-template<class T>
-ControlBlock* ControlBlock::fromRaw(std::remove_extent_t<T>* pointer) {
-    if (pointer == nullptr) return nullptr;
-
-    std::unique_ptr<T> guard(pointer);
-    UnqPtr<T>* owner = new UnqPtr<T>(pointer);
-    guard.release();
-    return create(owner);
+ControlBlock* ControlBlock::create(UnqPtr<T>&& owner) {
+    // Если память не выделится, объект останется во владении исходного UnqPtr.
+    return new TypedControlBlock<T>(std::move(owner));
 }
 
 #endif

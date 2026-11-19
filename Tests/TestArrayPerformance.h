@@ -18,17 +18,7 @@ namespace benchmark
 
     inline void allocateArray(ShrdPtr<int[]>& ptr, int size)
     {
-        UnqPtr<int[]>* master = new UnqPtr<int[]>();
-        try
-        {
-            master->reset(new int[size]{});
-        }
-        catch (...)
-        {
-            delete master;
-            throw;
-        }
-        ptr = ShrdPtr<int[]>(master);
+        ptr = makeShrdArray<int>(size);
     }
 
     inline void allocateArray(std::unique_ptr<int[]>& ptr, int size)

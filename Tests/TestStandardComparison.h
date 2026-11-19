@@ -58,7 +58,7 @@ namespace tests
 
     inline void compareSharedObject()
     {
-        ShrdPtr<int> first(new UnqPtr<int>(new int(20)));
+        ShrdPtr<int> first(UnqPtr<int>(new int(20)));
         std::shared_ptr<int> standard(new int(20));
         ShrdPtr<int> second(first);
         std::shared_ptr<int> standardSecond(standard);
@@ -85,7 +85,7 @@ namespace tests
 
     inline void compareSharedArray()
     {
-        ShrdPtr<int[]> first(new UnqPtr<int[]>(new int[3]{1, 2, 3}));
+        ShrdPtr<int[]> first(UnqPtr<int[]>(new int[3]{1, 2, 3}));
         std::shared_ptr<int[]> standard(new int[3]{1, 2, 3});
         ShrdPtr<int[]> second(first);
         std::shared_ptr<int[]> standardSecond(standard);
@@ -104,7 +104,7 @@ namespace tests
 
     inline void compareWeakObject()
     {
-        ShrdPtr<int> first(new UnqPtr<int>(new int(7)));
+        ShrdPtr<int> first(UnqPtr<int>(new int(7)));
         std::shared_ptr<int> standard(new int(7));
         WeakPtr<int> observer(first);
         std::weak_ptr<int> standardObserver(standard);
@@ -126,7 +126,7 @@ namespace tests
 
     inline void compareWeakArray()
     {
-        ShrdPtr<int[]> first(new UnqPtr<int[]>(new int[2]{10, 20}));
+        ShrdPtr<int[]> first(UnqPtr<int[]>(new int[2]{10, 20}));
         std::shared_ptr<int[]> standard(new int[2]{10, 20});
         WeakPtr<int[]> observer(first);
         std::weak_ptr<int[]> standardObserver(standard);

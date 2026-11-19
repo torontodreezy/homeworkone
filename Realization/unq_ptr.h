@@ -2,153 +2,99 @@
 #define UNQ_PTR_H
 
 #include <cstddef>
+#include <type_traits>
+#include <utility>
 
-// Владение одним объектом.
+namespace pointer_detail {
+    template <class From, class To>
+    concept Compatible = (std::is_array_v<From> == std::is_array_v<To>) &&
+        std::is_convertible_v<From*, To*>;
+
+    template <class From, class To>
+    concept UniqueCompatible = Compatible<From, To> &&
+    (std::is_array_v<To> ||
+        std::is_same_v<std::remove_cv_t<From>, std::remove_cv_t<To>> ||
+        std::has_virtual_destructor_v<To>);
+
+    // Тип владения для сырого указателя на объект или элемент массива.
+    template <class Owner, class U>
+    using RawOwner = std::conditional_t<std::is_array_v<Owner>, U[], U>;
+}
+
 template <class T>
 class UnqPtr {
-private:
-    T* pointer;
+    static_assert(!std::is_bounded_array_v<T>, "Use UnqPtr<T[]> for arrays");
+    using Element = std::remove_extent_t<T>;
+
+    Element* pointer = nullptr;
+
+    void replace(Element* newPointer) noexcept {
+        if (pointer == newPointer) return;
+
+        Element* old = std::exchange(pointer, newPointer);
+        if constexpr (std::is_array_v<T>) {
+            delete[] old;
+        }
+        else {
+            delete old;
+        }
+    }
 
 public:
-    UnqPtr() : pointer(nullptr) {}
+    UnqPtr() noexcept = default;
+    explicit UnqPtr(std::nullptr_t) noexcept {}
 
-    explicit UnqPtr(T* ptr) : pointer(ptr) {}
+    template <class U>
+        requires pointer_detail::UniqueCompatible<pointer_detail::RawOwner<T, U>, T>
+    explicit UnqPtr(U* ptr) noexcept : pointer(ptr) {}
 
-    // Копирование запрещено.
     UnqPtr(const UnqPtr&) = delete;
     UnqPtr& operator=(const UnqPtr&) = delete;
 
-    // Отдаём адрес без удаления объекта.
-    T* release() {
-        T* ptr = pointer;
-        pointer = nullptr;
+    UnqPtr(UnqPtr&& other) noexcept : pointer(other.release()) {}
 
-        return ptr;
-    }
-
-    //удаляем объект и указываем на nullptr
-    void reset() {
-        delete pointer;
-        pointer = nullptr;
-    }
-
-    //очищаем старый объект и меняем указатель
-    void reset(T* ptr) {
-        if (pointer != ptr) {
-            delete pointer;
-            pointer = ptr;
-        }
-    }
-
-    // Перемещение между одинаковыми типами.
-    UnqPtr(UnqPtr&& other) noexcept
-        : pointer(other.release()) {}
-
-    // Перемещение от наследника к базовому типу.
+    // При переходе к базовому типу удалять объект будет деструктор базы.
     template <class U>
-    UnqPtr(UnqPtr<U>&& other) noexcept
-        : pointer(nullptr) {
-        U* ptr = other.get();
-        pointer = ptr;
+        requires pointer_detail::UniqueCompatible<U, T>
+    UnqPtr(UnqPtr<U>&& other) noexcept : pointer(other.release()) {}
 
-        other.release();
-    }
-
-    //   = для переноса в уже существующий UnqPtr
     UnqPtr& operator=(UnqPtr&& other) noexcept {
-        if (this != &other) {
-            reset(other.release());
-        }
-
+        if (this != &other) replace(other.release());
         return *this;
     }
 
-    //перенести в control block
     template <class U>
+        requires pointer_detail::UniqueCompatible<U, T>
     UnqPtr& operator=(UnqPtr<U>&& other) noexcept {
-        U* source = other.get();
-        T* ptr = source;
-
-        other.release();
-        reset(ptr);
-
+        replace(other.release());
         return *this;
     }
 
-    //деструктор
     ~UnqPtr() {
-        delete pointer;
+        reset();
     }
 
-    //полцчаем сырой указатель
-    T* get() const {
+    Element* get() const noexcept {
         return pointer;
     }
-};
 
+    Element* release() noexcept {
+        return std::exchange(pointer, nullptr);
+    }
 
-// Владение массивом.
-template <class T>
-class UnqPtr<T[]> {
-private:
-    T* pointer;
+    void reset(std::nullptr_t = nullptr) noexcept {
+        replace(nullptr);
+    }
 
-public:
-    UnqPtr() : pointer(nullptr) {}
-
-    explicit UnqPtr(T* ptr) : pointer(ptr) {}
-
-    // Не принимаем массивы с другим типом элементов.
     template <class U>
-    UnqPtr(U*) = delete;
-
-    UnqPtr(const UnqPtr&) = delete;
-    UnqPtr& operator=(const UnqPtr&) = delete;
-
-    UnqPtr(UnqPtr&& other) noexcept
-        : pointer(other.release()) {}
-
-    UnqPtr& operator=(UnqPtr&& other) noexcept {
-        if (this != &other) {
-            reset(other.release());
-        }
-
-        return *this;
+        requires pointer_detail::UniqueCompatible<pointer_detail::RawOwner<T, U>, T>
+    void reset(U* ptr) noexcept {
+        replace(ptr);
     }
 
-    ~UnqPtr() {
-        delete[] pointer;
-    }
-
-    T* get() const {
-        return pointer;
-    }
-
-    T& operator[](std::size_t index) const {
+    Element& operator[](std::size_t index) const requires std::is_array_v<T> {
         return pointer[index];
     }
-
-    T* release() {
-        T* ptr = pointer;
-        pointer = nullptr;
-
-        return ptr;
-    }
-
-    void reset() {
-        delete[] pointer;
-        pointer = nullptr;
-    }
-
-    void reset(T* ptr) {
-        if (pointer != ptr) {
-            delete[] pointer;
-            pointer = ptr;
-        }
-    }
-
-    template <class U>
-    void reset(U*) = delete;
 };
 
 #endif

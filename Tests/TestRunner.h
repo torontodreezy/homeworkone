@@ -4,11 +4,6 @@
 
 #ifndef HOMEWORKONE_3_TESTRUNNER_H
 #define HOMEWORKONE_3_TESTRUNNER_H
-
-
-#ifndef TEST_RUNNER_H
-#define TEST_RUNNER_H
-
 #include <exception>
 #include <iostream>
 #include <stdexcept>
@@ -60,5 +55,4 @@ namespace tests
     }
 }
 
-#endif
 #endif //HOMEWORKONE_3_TESTRUNNER_H

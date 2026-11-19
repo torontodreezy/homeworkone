@@ -5,6 +5,10 @@
 #include "TestRunner.h"
 #include "TestObjects.h"
 
+static_assert(!std::is_constructible_v<ShrdPtr<int>, UnqPtr<int>*>);
+static_assert(!std::is_constructible_v<ShrdPtr<int>, UnqPtr<int>&>);
+static_assert(!std::is_constructible_v<ShrdPtr<tests::Base[]>, ShrdPtr<tests::Derived[]>>);
+
 namespace tests
 {
     inline void shrdDefault()
@@ -26,17 +30,20 @@ namespace tests
 
     inline void shrdValue()
     {
-        ShrdPtr<int> ptr(new UnqPtr<int>(new int(42)));
+        UnqPtr<int> owner(new int(42));
+        int* address = owner.get();
+        ShrdPtr<int> ptr(std::move(owner));
 
         check(
-            ptr.get() != nullptr && *ptr.get() == 42,
-            "Доступ через ведущий UnqPtr"
+            ptr.get() == address && *ptr == 42 && ptr.use_count() == 1,
+            "ShrdPtr должен принять тот же объект"
         );
+        check(owner.get() == nullptr, "Исходный UnqPtr должен стать пустым");
     }
 
     inline void shrdEmptyMaster()
     {
-        ShrdPtr<int> first(new UnqPtr<int>());
+        ShrdPtr<int> first(UnqPtr<int>{});
         ShrdPtr<int> second(first);
 
         check(
@@ -45,10 +52,25 @@ namespace tests
         );
     }
 
+    inline void shrdReset()
+    {
+        auto source = makeShrd<Derived>();
+        ShrdPtr<Base> ptr(std::move(source));
+        check(!source && ptr.use_count() == 1, "Переход к базе должен перенести владение");
+
+        ptr.reset(new Derived());
+        check(Derived::alive == 1, "reset должен удалить прежнего наследника");
+
+        Derived* empty = nullptr;
+        ptr.reset(empty);
+        check(!ptr && ptr.use_count() == 0 && Derived::alive == 0,
+              "reset с нулевым указателем должен удалить нового наследника");
+    }
+
     inline void shrdCopy()
     {
         ShrdPtr<Tracked> first(
-            new UnqPtr<Tracked>(new Tracked(10))
+            UnqPtr<Tracked>(new Tracked(10))
         );
 
         ShrdPtr<Tracked> second(first);
@@ -76,11 +98,11 @@ namespace tests
         int before = Tracked::destroyed;
 
         ShrdPtr<Tracked> first(
-            new UnqPtr<Tracked>(new Tracked(10))
+            UnqPtr<Tracked>(new Tracked(10))
         );
 
         ShrdPtr<Tracked> second(
-            new UnqPtr<Tracked>(new Tracked(20))
+            UnqPtr<Tracked>(new Tracked(20))
         );
 
         second = first;
@@ -98,7 +120,7 @@ namespace tests
 
     inline void shrdSelfAssign()
     {
-        ShrdPtr<int> ptr(new UnqPtr<int>(new int(5)));
+        ShrdPtr<int> ptr(UnqPtr<int>(new int(5)));
 
         int* before = ptr.get();
 
@@ -114,7 +136,7 @@ namespace tests
     inline void shrdSameObjectAssign()
     {
         ShrdPtr<Tracked> first(
-            new UnqPtr<Tracked>(new Tracked(1))
+            UnqPtr<Tracked>(new Tracked(1))
         );
 
         ShrdPtr<Tracked> second(first);
@@ -147,7 +169,7 @@ namespace tests
         int before = Tracked::destroyed;
 
         ShrdPtr<Tracked> ptr(
-            new UnqPtr<Tracked>(new Tracked(1))
+            UnqPtr<Tracked>(new Tracked(1))
         );
 
         ShrdPtr<Tracked> empty;
@@ -172,7 +194,7 @@ namespace tests
 
         {
             ShrdPtr<Tracked> first(
-                new UnqPtr<Tracked>(new Tracked(7))
+                UnqPtr<Tracked>(new Tracked(7))
             );
 
             {
@@ -210,7 +232,7 @@ namespace tests
 
         {
             ShrdPtr<Derived> first(
-                new UnqPtr<Derived>(new Derived())
+                UnqPtr<Derived>(new Derived())
             );
 
             ShrdPtr<Base> second(first);
@@ -249,7 +271,7 @@ namespace tests
         ShrdPtr<Base> second(first);
 
         ShrdPtr<Base> third(
-            new UnqPtr<Base>(new Base())
+            UnqPtr<Base>(new Base())
         );
 
         third = first;
@@ -263,7 +285,7 @@ namespace tests
     inline void shrdMultipleInheritance()
     {
         ShrdPtr<Multiple> first(
-            new UnqPtr<Multiple>(new Multiple())
+            UnqPtr<Multiple>(new Multiple())
         );
 
         ShrdPtr<Base> second(first);
@@ -287,7 +309,7 @@ namespace tests
 
         {
             ShrdPtr<Leaf> first(
-                new UnqPtr<Leaf>(new Leaf())
+                UnqPtr<Leaf>(new Leaf())
             );
 
             ShrdPtr<Middle> second(first);
@@ -308,7 +330,7 @@ namespace tests
         try
         {
             ShrdPtr<Tracked> first(
-                new UnqPtr<Tracked>(new Tracked(1))
+                UnqPtr<Tracked>(new Tracked(1))
             );
 
             ShrdPtr<Tracked> second(first);
@@ -335,7 +357,7 @@ namespace tests
         try
         {
             ShrdPtr<Tracked> first(
-                new UnqPtr<Tracked>(new Tracked(123))
+                UnqPtr<Tracked>(new Tracked(123))
             );
 
             for (int i = 0; i < size; ++i)
@@ -382,7 +404,7 @@ namespace tests
             for (int i = 0; i < size; ++i)
             {
                 items[i] = ShrdPtr<Tracked>(
-                    new UnqPtr<Tracked>(new Tracked(i))
+                    UnqPtr<Tracked>(new Tracked(i))
                 );
             }
 
@@ -416,10 +438,21 @@ namespace tests
         );
     }
 
+    inline void shrdArrayReset()
+    {
+        auto ptr = makeShrdArray<ArrayTracked>(3);
+        ptr.reset(new ArrayTracked[2]);
+        check(ArrayTracked::alive == 2, "reset должен удалить все элементы старого массива");
+
+        ptr.reset(nullptr);
+        check(!ptr && ptr.use_count() == 0 && ArrayTracked::alive == 0,
+              "reset(nullptr) должен удалить все элементы нового массива");
+    }
+
     inline void shrdArrayIndexCopy()
     {
         ShrdPtr<int[]> first(
-            new UnqPtr<int[]>(new int[3]{1, 2, 3})
+            UnqPtr<int[]>(new int[3]{1, 2, 3})
         );
 
         ShrdPtr<int[]> second(first);
@@ -442,11 +475,11 @@ namespace tests
         int before = ArrayTracked::destroyed;
 
         ShrdPtr<ArrayTracked[]> first(
-            new UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
+            UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
         );
 
         ShrdPtr<ArrayTracked[]> second(
-            new UnqPtr<ArrayTracked[]>(new ArrayTracked[2])
+            UnqPtr<ArrayTracked[]>(new ArrayTracked[2])
         );
 
         second = first;
@@ -466,7 +499,7 @@ namespace tests
     inline void shrdArraySelfAssign()
     {
         ShrdPtr<int[]> ptr(
-            new UnqPtr<int[]>(new int[2]{3, 4})
+            UnqPtr<int[]>(new int[2]{3, 4})
         );
 
         int* before = ptr.get();
@@ -486,7 +519,7 @@ namespace tests
 
         {
             ShrdPtr<ArrayTracked[]> first(
-                new UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
+                UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
             );
 
             ShrdPtr<ArrayTracked[]> second(first);
@@ -509,7 +542,7 @@ namespace tests
 
     inline void shrdArrayEmptyMaster()
     {
-        ShrdPtr<int[]> first(new UnqPtr<int[]>());
+        ShrdPtr<int[]> first(UnqPtr<int[]>{});
         ShrdPtr<int[]> second(first);
 
         check(
@@ -524,7 +557,7 @@ namespace tests
 
         {
             ShrdPtr<ArrayTracked[]> first(
-                new UnqPtr<ArrayTracked[]>(new ArrayTracked[4])
+                UnqPtr<ArrayTracked[]>(new ArrayTracked[4])
             );
 
             ShrdPtr<ArrayTracked[]> second(first);
@@ -542,7 +575,7 @@ namespace tests
         try
         {
             ShrdPtr<ArrayTracked[]> first(
-                new UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
+                UnqPtr<ArrayTracked[]>(new ArrayTracked[3])
             );
 
             ShrdPtr<ArrayTracked[]> second(first);
@@ -567,11 +600,11 @@ namespace tests
     inline void shrdArrayAssignFromElement()
     {
         ShrdPtr<ArrayNode[]> first(
-            new UnqPtr<ArrayNode[]>(new ArrayNode[1])
+            UnqPtr<ArrayNode[]>(new ArrayNode[1])
         );
 
         first[0].next = ShrdPtr<ArrayNode[]>(
-            new UnqPtr<ArrayNode[]>(new ArrayNode[1])
+            UnqPtr<ArrayNode[]>(new ArrayNode[1])
         );
 
         ArrayNode* expected = first[0].next.get();
@@ -592,6 +625,7 @@ namespace tests
         run("Конструктор из nullptr", shrdNull);
         run("Создание через ведущий UnqPtr", shrdValue);
         run("Дескрипторы пустого ведущего указателя", shrdEmptyMaster);
+        run("Замена и удаление объекта через reset", shrdReset);
         run("Копирование разделяет один объект", shrdCopy);
         run("Присваивание удаляет старый объект", shrdAssign);
         run("Присваивание самому себе", shrdSelfAssign);
@@ -607,6 +641,7 @@ namespace tests
         run("1000 дескрипторов одного объекта", shrdManyOwners);
         run("1000 независимых объектов", shrdManyObjects);
         run("Пустые дескрипторы массива", shrdArrayDefault);
+        run("Замена и удаление массива через reset", shrdArrayReset);
         run("Копирование и индексация массива", shrdArrayIndexCopy);
         run("Присваивание дескрипторов массива", shrdArrayAssign);
         run("Самоприсваивание дескриптора массива", shrdArraySelfAssign);
